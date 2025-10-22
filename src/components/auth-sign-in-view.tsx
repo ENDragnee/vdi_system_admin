@@ -3,18 +3,22 @@
 import type React from "react"
 import Link from "next/link"
 import { SignInForm } from "@/components/signin-form"
+import { AuthErrorDisplay } from "@/components/auth-error-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface SignInViewProps {
   onSubmit: (e: React.FormEvent) => Promise<void>
   isLoading: boolean
   handleSocial: (provider: "google" | "apple") => Promise<void>
+  error?: string
 }
 
-export function SignInView({ onSubmit, isLoading, handleSocial }: SignInViewProps) {
+export function SignInView({ onSubmit, isLoading, handleSocial, error }: SignInViewProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-md">
+        <AuthErrorDisplay error={error || ""} />
+
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-lg mb-4">
             <span className="text-white font-bold text-lg">D</span>

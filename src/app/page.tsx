@@ -50,12 +50,12 @@ export default function Home() {
               from a single, powerful dashboard.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/signup">
+              <Link href="/auth?view=signup">
                 <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8">
                   Start Monitoring
                 </Button>
               </Link>
-              <Link href="/auth/signin">
+              <Link href="/auth?view=signin">
                 <Button size="lg" variant="outline" className="border-slate-600 text-white hover:bg-slate-800 text-lg px-8">
                   View Demo
                 </Button>

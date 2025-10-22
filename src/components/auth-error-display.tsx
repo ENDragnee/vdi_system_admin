@@ -8,8 +8,8 @@ export function AuthErrorDisplay({ error }: AuthErrorDisplayProps) {
   if (!error) return null
 
   return (
-    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-      <div className="flex">
+    <div className="max-w-md mx-auto mb-6 bg-red-900/20 border border-red-700/50 rounded-lg p-4">
+      <div className="flex gap-3">
         <div className="flex-shrink-0">
           <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
             <path
@@ -19,8 +19,8 @@ export function AuthErrorDisplay({ error }: AuthErrorDisplayProps) {
             />
           </svg>
         </div>
-        <div className="ml-3">
-          <p className="text-sm text-red-800">{error}</p>
+        <div className="flex-1">
+          <p className="text-sm text-red-200">{error}</p>
         </div>
       </div>
     </div>
