@@ -15,7 +15,7 @@ interface SignInViewProps {
 
 export function SignInView({ onSubmit, isLoading, handleSocial, error }: SignInViewProps) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-md">
         <AuthErrorDisplay error={error || ""} />
 

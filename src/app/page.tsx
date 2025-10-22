@@ -5,7 +5,7 @@ import { Server, Shield, BarChart3, Zap, CheckCircle, Activity } from 'lucide-re
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
       <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -41,7 +41,7 @@ export default function Home() {
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
               Manage Your Virtual Desktops
               <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-400 to-cyan-400">
                 With Confidence
               </span>
             </h1>

@@ -88,13 +88,13 @@ export default function AuthClientPage({
 
   return (
     <>
+      <AuthErrorDisplay error={error} />
+
       {isSignIn ? (
         <SignInView onSubmit={handleEmailAuth} isLoading={isLoading} handleSocial={handleSocialAuth} />
       ) : (
         <SignUpView onSubmit={handleEmailAuth} isLoading={isLoading} handleSocial={handleSocialAuth}/>
       )}
-
-      <AuthErrorDisplay error={error} />
     </>
   );
 }
