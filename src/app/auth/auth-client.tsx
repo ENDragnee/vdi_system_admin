@@ -59,7 +59,7 @@ export default function AuthClientPage({
           setError("Invalid email or password");
         } else {
           // Navigate client-side immediately after successful sign in
-          router.push("/shop");
+          router.push("/dashboard");
         }
       } else {
         const result = await signUp(formEmail, formPassword, formName);
@@ -67,7 +67,7 @@ export default function AuthClientPage({
           setError("Failed to create account");
         } else {
           // Navigate client-side immediately after successful sign up
-          router.push("/shop");
+          router.push("/dashboard");
         }
       }
     } catch (err) {
