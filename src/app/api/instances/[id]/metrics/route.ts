@@ -14,11 +14,14 @@ interface MetricPoint {
   network_out: number;
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const hostId = params.id;
+interface RouteParams {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  const hostId = (await params).id;
   const timeRange = "-1h";
   const windowPeriod = "1m";
 

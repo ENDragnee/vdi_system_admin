@@ -26,22 +26,26 @@ export async function GET() {
   const fluxQuery = `
     import "influxdata/influxdb/schema"
     import "strings"
+    import "join"
 
-    // 1. Discover hosts
+    // 1. Discover all hosts (use a wider range to capture all hosts ever seen)
     hosts = from(bucket: "${bucket}")
-      |> range(start: -24h)
+      |> range(start: -30d) // Increased range to ensure all hosts are captured
+      |> filter(fn: (r) => exists r.host) // Ensure host tag exists
       |> keep(columns: ["host"])
+      |> group() // Group to get all unique hosts
       |> distinct(column: "host")
-      |> findColumn(fn: (key) => true, column: "_value")
+      |> keep(columns: ["_value"])
+      |> rename(columns: {_value: "host"}) // Prepare for filtering
 
     // 2a. Fetch STRING metadata
     meta_strings = from(bucket: "${bucket}")
       |> range(start: -30d)
       |> filter(fn: (r) => r._measurement == "system_meta" and (r._field == "os_type" or r._field == "ip_address"))
-      |> filter(fn: (r) => contains(value: r.host, set: hosts))
+      |> filter(fn: (r) => exists r.host)
       |> group(columns: ["host", "_field"])
       |> last()
-      |> keep(columns: ["_time", "host", "_field", "_value"])
+      |> keep(columns: ["host", "_field", "_value"])
 
     // 2b. Fetch NUMERIC metadata
     meta_numerics = from(bucket: "${bucket}")
@@ -51,11 +55,10 @@ export async function GET() {
           (r._measurement == "mem" and r._field == "total") or
           (r._measurement == "disk" and r._field == "total")
       )
-      |> filter(fn: (r) => contains(value: r.host, set: hosts))
+      |> filter(fn: (r) => exists r.host)
       |> group(columns: ["host", "_measurement", "_field"])
       |> last()
       |> map(fn: (r) => ({
-          _time: r._time,
           host: r.host,
           _field:
               if r._measurement == "mem" and r._field == "total" then "ram_total"
@@ -63,9 +66,6 @@ export async function GET() {
               else r._field,
           _value: float(v: r._value)
       }))
-
-    // 2c. Union metadata streams
-    meta_data = union(tables: [meta_strings, meta_numerics])
 
     // 3. Fetch live metrics
     live_data = from(bucket: "${bucket}")
@@ -75,11 +75,10 @@ export async function GET() {
           (r._measurement == "mem" and r._field == "used") or
           (r._measurement == "disk" and r._field == "used" and r.path == "/")
       )
-      |> filter(fn: (r) => contains(value: r.host, set: hosts))
+      |> filter(fn: (r) => exists r.host)
       |> group(columns: ["host", "_measurement", "_field", "path", "cpu"])
       |> last()
       |> map(fn: (r) => ({
-          _time: r._time,
           host: r.host,
           _field:
               if r._measurement == "cpu" then "cpu_usage"
@@ -90,31 +89,46 @@ export async function GET() {
               else float(v: r._value)
       }))
 
-    // 4. Calculate network rates - UPDATED LOGIC
+    // 4. Calculate network rates
     net_data = from(bucket: "${bucket}")
       |> range(start: -2m)
       |> filter(fn: (r) => r._measurement == "net" and (r._field == "bytes_recv" or r._field == "bytes_sent"))
-      |> filter(fn: (r) => contains(value: r.host, set: hosts))
-      |> filter(fn: (r) => r.interface != "lo") // Exclude loopback interface
+      |> filter(fn: (r) => exists r.host)
+      |> filter(fn: (r) => r.interface != "lo")
       |> group(columns: ["host", "_field", "_time"])
-      |> sum(column: "_value") // Sum bytes from all interfaces at each timestamp
-      |> group(columns: ["host", "_field"]) // Ungroup to calculate derivative across time
-      |> derivative(unit: 1s, nonNegative: true) // Calculate rate on the summed series
+      |> sum(column: "_value")
+      |> group(columns: ["host", "_field"])
+      |> derivative(unit: 1s, nonNegative: true)
       |> last()
       |> map(fn: (r) => ({
-          _time: r._time,
           host: r.host,
           _field: if r._field == "bytes_recv" then "network_in" else "network_out",
           _value: r._value
       }))
 
-    // 5. Combine all data streams
-    allData = union(tables: [meta_data, live_data, net_data])
-      |> group(columns: ["host", "_field"])
-      |> last()
+    // 5. Combine and pivot all metric data
+    pivoted_data = union(tables: [meta_strings, meta_numerics, live_data, net_data])
       |> pivot(rowKey: ["host"], columnKey: ["_field"], valueColumn: "_value")
 
-    // 6. Final mapping
+    // 6. Get creation time for each host
+    creation_times = from(bucket: "${bucket}")
+      |> range(start: -30d)
+      |> filter(fn: (r) => r._measurement == "system_meta" and r._field == "os_type")
+      |> filter(fn: (r) => exists r.host)
+      |> group(columns: ["host"])
+      |> first()
+      |> map(fn: (r) => ({ host: r.host, created_at_str: string(v: r._time) }))
+      |> keep(columns: ["host", "created_at_str"])
+
+    // 7. Join the creation time onto the main pivoted data
+    allData = join.left(
+        left: pivoted_data,
+        right: creation_times,
+        on: (l, r) => l.host == r.host,
+        as: (l, r) => ({ l with created_at: r.created_at_str })
+    )
+
+    // 8. Final mapping
     allData
       |> map(fn: (r) => {
         ram_total_bytes = if exists r.ram_total then float(v: r.ram_total) else 0.0
@@ -136,7 +150,7 @@ export async function GET() {
           storage_used: storage_used_bytes / 1024.0 / 1024.0 / 1024.0,
           network_in: if exists r.network_in then float(v: r.network_in) / 1024.0 / 1024.0 else 0.0,
           network_out: if exists r.network_out then float(v: r.network_out) / 1024.0 / 1024.0 else 0.0,
-          created_at: if exists r._time then string(v: r._time) else ""
+          created_at: if exists r.created_at then r.created_at else ""
         }
     })
   `;
