@@ -134,7 +134,7 @@ export default function DashboardPage() {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 flex-grow flex flex-col justify-end">
+              <CardContent className="space-y-4 grow flex flex-col justify-end">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <div className="flex items-center text-slate-300">
@@ -195,7 +195,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
       <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
