@@ -63,12 +63,12 @@ export function SignInForm({
         </div>
       </div>
 
-      <div className="flex items-center space-x-2">
+      {/* <div className="flex items-center space-x-2">
         <Checkbox id="remember" className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600" />
         <label htmlFor="remember" className="text-sm text-slate-400">
           Remember me
         </label>
-      </div>
+      </div> */}
 
       <Button
         type="submit"
@@ -78,35 +78,7 @@ export function SignInForm({
         {isLoading ? "Signing In..." : "Sign In"}
       </Button>
 
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-slate-700" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-slate-800/50 px-2 text-slate-400 tracking-wider">Or continue with</span>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Button
-          type="button"
-          onClick={() => handleSocial("google")}
-          variant="outline"
-          disabled={isLoading}
-          className="border-slate-600 hover:border-blue-600 hover:bg-blue-600/10 bg-slate-900/50 text-slate-200 hover:text-slate-100"
-        >
-          Google
-        </Button>
-        <Button
-          type="button"
-          onClick={() => handleSocial("apple")}
-          variant="outline"
-          disabled={isLoading}
-          className="border-slate-600 hover:border-blue-600 hover:bg-blue-600/10 bg-slate-900/50 text-slate-200 hover:text-slate-100"
-        >
-          Apple
-        </Button>
-      </div>
     </form>
   )
 }
