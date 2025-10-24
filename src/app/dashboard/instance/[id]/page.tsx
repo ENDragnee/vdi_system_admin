@@ -143,7 +143,7 @@ export default function InstanceDetailPage() {
   // UI state for error or if the instance is not found
   if (error || !instance) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white mb-4">{error || "Instance Not Found"}</h2>
           <Link href="/dashboard">
