@@ -1,136 +1,151 @@
-"use client"
+"use client";
 
-import { useMemo } from "react"
-import { useRouter, useParams } from "next/navigation"
-import Link from "next/link"
-import dynamic from "next/dynamic"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Server, Cpu, HardDrive, Activity, ArrowLeft, Calendar, Clock, Network } from "lucide-react"
+import { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import axios from "axios";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Server, Cpu, HardDrive, Activity, ArrowLeft, Calendar, Clock, Network, RefreshCw } from "lucide-react";
 
-const DUMMY_INSTANCES: Record<string, any> = {
-  "1": {
-    id: "1",
-    name: "Production Server 1",
-    status: "online",
-    os_type: "Ubuntu 22.04",
-    ip_address: "192.168.1.100",
-    cpu_cores: 8,
-    cpu_usage: 45.2,
-    ram_used: 8192,
-    ram_total: 16384,
-    storage_used: 250,
-    storage_total: 500,
-    network_in: 125.5,
-    network_out: 89.3,
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    last_updated: new Date().toISOString(),
-  },
-  "2": {
-    id: "2",
-    name: "Development Server",
-    status: "online",
-    os_type: "Ubuntu 20.04",
-    ip_address: "192.168.1.101",
-    cpu_cores: 4,
-    cpu_usage: 28.7,
-    ram_used: 4096,
-    ram_total: 8192,
-    storage_used: 120,
-    storage_total: 300,
-    network_in: 45.2,
-    network_out: 32.1,
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    last_updated: new Date().toISOString(),
-  },
-  "3": {
-    id: "3",
-    name: "Database Server",
-    status: "online",
-    os_type: "CentOS 8",
-    ip_address: "192.168.1.102",
-    cpu_cores: 16,
-    cpu_usage: 62.5,
-    ram_used: 12288,
-    ram_total: 16384,
-    storage_used: 450,
-    storage_total: 500,
-    network_in: 256.8,
-    network_out: 198.4,
-    created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-    last_updated: new Date().toISOString(),
-  },
-  "4": {
-    id: "4",
-    name: "Backup Server",
-    status: "maintenance",
-    os_type: "Ubuntu 22.04",
-    ip_address: "192.168.1.103",
-    cpu_cores: 4,
-    cpu_usage: 15.3,
-    ram_used: 2048,
-    ram_total: 8192,
-    storage_used: 380,
-    storage_total: 1000,
-    network_in: 12.5,
-    network_out: 8.2,
-    created_at: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-    last_updated: new Date().toISOString(),
-  },
+// Interface for the main instance details
+interface Instance {
+  id: string;
+  name: string;
+  status: "online" | "offline";
+  os_type: string;
+  ip_address: string;
+  cpu_cores: number;
+  cpu_usage: number;
+  ram_used: number;    // in MB
+  ram_total: number;   // in MB
+  storage_used: number;// in GB
+  storage_total: number;// in GB
+  network_in: number;  // in MB/s
+  network_out: number; // in MB/s
+  created_at: string;
+  last_updated: string;
 }
 
-const generateDummyMetrics = (instanceId: string) => {
-  const metrics = []
-  const now = Date.now()
-  const instance = DUMMY_INSTANCES[instanceId]
-
-  for (let i = 50; i > 0; i--) {
-    const timestamp = now - i * 60 * 1000 // 1 minute intervals
-    const variance = Math.sin(i / 10) * 20
-
-    metrics.push({
-      id: `metric-${i}`,
-      vds_id: instanceId,
-      cpu_usage: Math.max(5, Math.min(95, instance.cpu_usage + variance + (Math.random() - 0.5) * 10)),
-      ram_used: Math.max(1024, Math.min(instance.ram_total - 1024, instance.ram_used + (Math.random() - 0.5) * 2048)),
-      storage_used: instance.storage_used + (Math.random() - 0.5) * 10,
-      network_in: Math.max(0, instance.network_in + (Math.random() - 0.5) * 50),
-      network_out: Math.max(0, instance.network_out + (Math.random() - 0.5) * 40),
-      recorded_at: new Date(timestamp).toISOString(),
-    })
-  }
-
-  return metrics
+// Interface for a single point of historical data from the metrics API
+interface MetricPoint {
+  recorded_at: string;
+  cpu_usage: number;
+  ram_used: number;      // in MB
+  storage_used: number;  // in GB
+  network_in: number;    // in MB/s
+  network_out: number;   // in MB/s
 }
 
+// Dynamically import charts to prevent SSR issues, with a loading state
 const ResourceChart = dynamic(
   () => import("@/components/ResourceChart").then((mod) => ({ default: mod.ResourceChart })),
   {
     ssr: false,
     loading: () => <div className="h-[300px] flex items-center justify-center text-slate-400">Loading chart...</div>,
-  },
-)
+  }
+);
 
 const NetworkChart = dynamic(() => import("@/components/NetworkChart").then((mod) => ({ default: mod.NetworkChart })), {
   ssr: false,
   loading: () => <div className="h-[300px] flex items-center justify-center text-slate-400">Loading chart...</div>,
-})
+});
+
+// Define the polling interval in milliseconds
+const POLLING_INTERVAL = 5000; // 30 seconds
 
 export default function InstanceDetailPage() {
-  const router = useRouter()
-  const params = useParams()
-  const instanceId = params.id as string
+  const params = useParams();
+  const instanceId = params.id as string;
 
-  const instance = DUMMY_INSTANCES[instanceId]
-  const metrics = useMemo(() => generateDummyMetrics(instanceId), [instanceId])
+  // State variables to hold data and manage UI state
+  const [instance, setInstance] = useState<Instance | null>(null);
+  const [metrics, setMetrics] = useState<MetricPoint[]>([]);
+  const [isLoading, setIsLoading] = useState(true); // For the initial page load
+  const [isRefetching, setIsRefetching] = useState(false); // For manual/polling refresh
+  const [error, setError] = useState<string | null>(null);
 
-  if (!instance) {
+  // Memoize the data fetching function with useCallback
+  const fetchData = useCallback(async (isRefresh = false) => {
+    // Only show the full-page loader on the initial fetch
+    if (!isRefresh) {
+      setIsLoading(true);
+    }
+    setIsRefetching(true);
+    setError(null);
+
+    try {
+      // Fetch instance details and historical metrics in parallel for efficiency
+      const [allInstancesRes, metricsRes] = await Promise.all([
+        axios.get("/api/instances"),
+        axios.get(`/api/instances/${instanceId}/metrics`)
+      ]);
+
+      const allInstances: Instance[] = allInstancesRes.data;
+      const metricsData: MetricPoint[] = metricsRes.data;
+
+      const currentInstance = allInstances.find(inst => inst.id === instanceId);
+
+      if (!currentInstance) {
+        throw new Error("Instance not found.");
+      }
+
+      // Determine the last updated time from the latest metric point
+      const lastUpdatedTime = metricsData.length > 0
+        ? metricsData[metricsData.length - 1].recorded_at
+        : currentInstance.created_at;
+
+      setInstance({ ...currentInstance, last_updated: lastUpdatedTime });
+      setMetrics(metricsData);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "An unknown error occurred";
+      setError(errorMessage);
+      console.error("Failed to fetch instance data:", e);
+    } finally {
+      setIsLoading(false);
+      setIsRefetching(false);
+    }
+  }, [instanceId]);
+
+  // useEffect for the initial data load
+  useEffect(() => {
+    if (instanceId) {
+      fetchData();
+    }
+  }, [instanceId, fetchData]);
+
+  // useEffect for setting up the polling interval
+  useEffect(() => {
+    if (!instanceId) return;
+
+    // Set up an interval to refetch data periodically
+    const intervalId = setInterval(() => {
+      fetchData(true); // Pass true to indicate it's a background refresh
+    }, POLLING_INTERVAL);
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, [instanceId, fetchData]);
+
+  // UI state for initial loading
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-900 flex items-center justify-center text-white text-lg">
+        <Activity className="w-6 h-6 mr-3 animate-spin" />
+        Loading Instance Data...
+      </div>
+    );
+  }
+
+  // UI state for error or if the instance is not found
+  if (error || !instance) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Instance Not Found</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">{error || "Instance Not Found"}</h2>
           <Link href="/dashboard">
             <Button className="bg-blue-600 hover:bg-blue-700">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -139,39 +154,41 @@ export default function InstanceDetailPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
+  // Helper function to render status badge
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "online":
-        return <Badge className="bg-green-600 hover:bg-green-700">Online</Badge>
+        return <Badge className="bg-green-600 hover:bg-green-700">Online</Badge>;
       case "offline":
-        return <Badge className="bg-red-600 hover:bg-red-700">Offline</Badge>
-      case "maintenance":
-        return <Badge className="bg-amber-600 hover:bg-amber-700">Maintenance</Badge>
+        return <Badge className="bg-red-600 hover:bg-red-700">Offline</Badge>;
       default:
-        return <Badge variant="secondary">Unknown</Badge>
+        return <Badge variant="secondary">Unknown</Badge>;
     }
-  }
+  };
 
+  // Helper to format data for the resource chart, with null-safety
   const formatChartData = () => {
     return metrics.map((metric) => ({
       time: new Date(metric.recorded_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      cpu: Number(metric.cpu_usage.toFixed(2)),
-      ram: Number(((metric.ram_used / (instance?.ram_total || 1)) * 100).toFixed(2)),
-      storage: Number(((metric.storage_used / (instance?.storage_total || 1)) * 100).toFixed(2)),
-    }))
-  }
+      cpu: Number((metric.cpu_usage || 0).toFixed(2)),
+      ram: Number((((metric.ram_used || 0) / (instance.ram_total || 1)) * 100).toFixed(2)),
+      storage: Number((((metric.storage_used || 0) / (instance.storage_total || 1)) * 100).toFixed(2)),
+    }));
+  };
 
+  // Helper to format data for the network chart, with null-safety
   const formatNetworkData = () => {
     return metrics.map((metric) => ({
       time: new Date(metric.recorded_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      in: Number(metric.network_in.toFixed(2)),
-      out: Number(metric.network_out.toFixed(2)),
-    }))
-  }
+      in: Number((metric.network_in || 0).toFixed(2)),
+      out: Number((metric.network_out || 0).toFixed(2)),
+    }));
+  };
 
+  // Main component render
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-lg sticky top-0 z-50">
@@ -189,7 +206,19 @@ export default function InstanceDetailPage() {
               </div>
               <span className="text-xl font-bold text-white">{instance.name}</span>
             </div>
-            <div className="flex items-center space-x-3">{getStatusBadge(instance.status)}</div>
+            <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchData(true)}
+                disabled={isRefetching}
+                className="bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300 hover:text-white"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+                {isRefetching ? 'Refreshing...' : 'Refresh'}
+              </Button>
+              {getStatusBadge(instance.status)}
+            </div>
           </div>
         </div>
       </nav>
@@ -255,7 +284,7 @@ export default function InstanceDetailPage() {
             <CardContent>
               <Progress value={(instance.ram_used / instance.ram_total) * 100} className="h-3" />
               <p className="text-sm text-slate-400 mt-2">
-                {instance.ram_used} MB / {instance.ram_total} MB
+                {instance.ram_used.toFixed(0)} MB / {instance.ram_total.toFixed(0)} MB
               </p>
             </CardContent>
           </Card>
@@ -275,7 +304,7 @@ export default function InstanceDetailPage() {
             <CardContent>
               <Progress value={(instance.storage_used / instance.storage_total) * 100} className="h-3" />
               <p className="text-sm text-slate-400 mt-2">
-                {instance.storage_used} GB / {instance.storage_total} GB
+                {instance.storage_used.toFixed(2)} GB / {instance.storage_total.toFixed(2)} GB
               </p>
             </CardContent>
           </Card>
@@ -286,7 +315,7 @@ export default function InstanceDetailPage() {
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur mb-8">
               <CardHeader>
                 <CardTitle className="text-white">Resource Usage Over Time</CardTitle>
-                <CardDescription className="text-slate-400">CPU, RAM, and Storage utilization history</CardDescription>
+                <CardDescription className="text-slate-400">CPU, RAM, and Storage utilization for the last hour</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResourceChart data={formatChartData()} />
@@ -300,7 +329,7 @@ export default function InstanceDetailPage() {
                   Network Traffic
                 </CardTitle>
                 <CardDescription className="text-slate-400">
-                  Incoming and outgoing network traffic (MB/s)
+                  Incoming and outgoing network traffic (MB/s) for the last hour
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -313,7 +342,7 @@ export default function InstanceDetailPage() {
             <CardContent className="py-16 text-center">
               <Activity className="w-12 h-12 text-slate-600 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">No Historical Data</h3>
-              <p className="text-slate-400">Metrics history will appear here once data is collected</p>
+              <p className="text-slate-400">Metrics history for the last hour will appear here.</p>
             </CardContent>
           </Card>
         )}
@@ -348,5 +377,5 @@ export default function InstanceDetailPage() {
         </Card>
       </main>
     </div>
-  )
+  );
 }
