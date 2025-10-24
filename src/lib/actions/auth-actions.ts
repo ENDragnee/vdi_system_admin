@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { auth } from "@/../auth";
+import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
 export const signUp = async (email: string, password: string, name: string) => {
@@ -29,7 +29,7 @@ export const signIn = async (email: string, password: string) => {
   return result;
 };
 
-export const signInSocial = async (provider:"google" | "apple") => {
+export const signInSocial = async (provider: "google" | "apple") => {
   const { url } = await auth.api.signInSocial({
     body: {
       provider,
