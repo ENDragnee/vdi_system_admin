@@ -1,17 +1,52 @@
-version: "3.9"
+name: vdi_system_admin
+
 services:
   postgres:
-    image: postgres:latest
-    container_name: postgres-db
+    image: postgres:17.6
+    container_name: vdi_admin_postgres
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret123
-      POSTGRES_DB: vdi_db
+      POSTGRES_USER: vdi_admin
+      POSTGRES_PASSWORD: $(POSTGRES_PASSWORD)
+      POSTGRES_DB: vdi_postgres
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - vdi_admin_postgres:/var/lib/postgresql/data
+    networks:
+      - vdi_network
+
+  influxdb:
+    image: influxdb:2.7.12
+    container_name: vdi_influx_db
+    restart: always
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    networks:
+      - vdi_network
+
+  nextjs_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vdi_system_admin_app
+    restart: always
+    env_file:
+      - .env.local
+    ports:
+      - "3000:3000"
+    networks:
+      - vdi_network
+    depends_on:
+      - postgres
+      - influxdb
 
 volumes:
-  postgres_data:
+  vdi_admin_postgres:
+  influxdb_data:
+
+networks:
+  vdi_network:
+    driver: bridge
