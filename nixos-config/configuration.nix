@@ -1,14 +1,15 @@
 # Edit this configuration file to define what should be installed on
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
-
-{ config, lib, pkgs, ... }:
-
-{
-  imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-    ];
+{ config
+, lib
+, pkgs
+, ...
+}: {
+  imports = [
+    # Include the results of the hardware scan.
+    ./hardware-configuration.nix
+  ];
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
@@ -17,7 +18,7 @@
   networking.hostName = "vdi"; # Define your hostname.
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-  networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
+  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
 
   # Set your time zone.
   time.timeZone = "Africa/Addis_Ababa";
@@ -29,14 +30,13 @@
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
   #console = {
-   # font = "Lat2-Terminus16";
-   # keyMap = "us";
-   # useXkbConfig = true; # use xkb.options in tty.
+  # font = "Lat2-Terminus16";
+  # keyMap = "us";
+  # useXkbConfig = true; # use xkb.options in tty.
   # };
 
   # Enable the X11 windowing system.
   services.xserver.enable = true;
-
 
   fonts.packages = with pkgs; [
     roboto
@@ -52,7 +52,7 @@
     style = lib.mkForce "kvantum";
     platformTheme = "qt5ct"; #can be qt5ct;
   };
-  
+
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   # Configure keymap in X11
@@ -165,7 +165,7 @@
   services.xserver.windowManager.openbox.enable = true;
   services.telegraf = {
     enable = true;
-    environmentFiles = ["/etc/nixos/telegraf.env"];
+    environmentFiles = [ "/etc/nixos/telegraf.env" ];
     extraConfig = {
       global_tags = {
         dc = "us-east-1";
@@ -173,67 +173,72 @@
 
       agent = {
         interval = "10s";
-	round_interval = true;
-	metric_batch_size = 1000;
-	metric_buffer_limit = 10000;
-	collection_jitter = "0s";
-	flush_interval = "10s";
-	flush_jitter = "0s";
-	precision = "0s";
-	hostname = "";
+        round_interval = true;
+        metric_batch_size = 1000;
+        metric_buffer_limit = 10000;
+        collection_jitter = "0s";
+        flush_interval = "10s";
+        flush_jitter = "0s";
+        precision = "0s";
+        hostname = "";
       };
 
       inputs = {
         exec = [
-	{
-	  commands = ["sh -c 'source /etc/os-release && echo $PRETTY_NAME'"];
-	  timeout = "5s";
-	  data_format = "grok";
-	  name_override = "system_meta";
-	  grok_patterns = ["%{GREEDYDATA:os_type}"];
-	  interval = "0s";
-	}
+          {
+            commands = [ "sh -c 'source /etc/os-release && echo $PRETTY_NAME'" ];
+            timeout = "5s";
+            data_format = "grok";
+            name_override = "system_meta";
+            grok_patterns = [ "%{GREEDYDATA:os_type}" ];
+            interval = "0s";
+          }
 
-	{
-	  commands = ["sh -c \"ip -4 addr show scope global | grep inet | awk '{print \\$2}' | cut -d '/' -f 1 | head -n 1\""];
-	  timeout = "5s";
-	  data_format = "grok";
-	  name_override = "system_meta";
-	  grok_patterns = ["%{IP:ip_address}"];
-	  interval = "0s";
-	}
-	];
+          {
+            commands = [ "sh -c \"ip -4 addr show scope global | grep inet | awk '{print \\$2}' | cut -d '/' -f 1 | head -n 1\"" ];
+            timeout = "5s";
+            data_format = "grok";
+            name_override = "system_meta";
+            grok_patterns = [ "%{IP:ip_address}" ];
+            interval = "0s";
+          }
+        ];
 
-	cpu = {
-	  percpu = true;
-	  totalcpu = true;
-	  collect_cpu_time = false;
-	  report_active = true;
-	  core_tags = false;
-	};
+        cpu = {
+          percpu = true;
+          totalcpu = true;
+          collect_cpu_time = false;
+          report_active = true;
+          core_tags = false;
+        };
 
-	disk = {
-	  mount_points = ["/"];
-	  ignore_fs = ["tmpfs" "devtmpfs" "devfs" "iso9660" "overlay" "aufs" "squashfs"];
-	};
+        disk = {
+          mount_points = [ "/" ];
+          ignore_fs = [ "tmpfs" "devtmpfs" "devfs" "iso9660" "overlay" "aufs" "squashfs" ];
+        };
 
-	diskio = {};
-	kernel = {};
-	mem = {};
-	net = {};
-	processes = {};
-	swap = {};
-	system = {};
+        diskio = { };
+        kernel = { };
+        mem = { };
+        net = { };
+        processes = { };
+        swap = { };
+        system = { };
       };
       outputs = {
         influxdb_v2 = {
-	  #urls = ["http://192.168.68.107:8086"];
-	  urls = ["http://192.168.7.107:8086"];
-	  token = "$INFLUX_TOKEN";
-	  organization = "code_tamers";
-	  bucket = "vdi_bucket";
-	  timeout = "5s";
-	};
+          #urls = ["http://192.168.68.107:8086"];
+          urls = [ "http://192.168.7.107:8086" ];
+          token = "$INFLUX_TOKEN";
+          organization = "code_tamers";
+          bucket = "vdi_bucket";
+          timeout = "5s";
+        };
+        kafka = {
+          brokers = [ "192.169.53.107:9092" ];
+          topic = "vm-metrics";
+          data_format = "json";
+        };
       };
     };
   };
@@ -246,13 +251,13 @@
   };
 
   #services.greetd = {
-    #enable = true;
-    #settings = {
-      #default_session = {
-        #command = "${pkgs.labwc}/bin/labwc";
-        #user = "vdi";
-      #};
-    #};
+  #enable = true;
+  #settings = {
+  #default_session = {
+  #command = "${pkgs.labwc}/bin/labwc";
+  #user = "vdi";
+  #};
+  #};
   #};
 
   # Ensure seat management works
@@ -261,8 +266,8 @@
 
   #programs.regreet.enable = true;
   #programs.regreet.settings = {
-    #background = "/etc/nixos/greetd_background/login.jpg";
-    #scale = 1.0;
+  #background = "/etc/nixos/greetd_background/login.jpg";
+  #scale = 1.0;
   #};
 
   # Enable hardware acceleration
@@ -309,6 +314,4 @@
   #
   # For more information, see `man configuration.nix` or https://nixos.org/manual/nixos/stable/options#opt-system.stateVersion .
   system.stateVersion = "25.05"; # Did you read the comment?
-
 }
-

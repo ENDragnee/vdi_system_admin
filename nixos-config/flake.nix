@@ -21,10 +21,10 @@
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
-          
+
           home-manager.users.vdi = import ./home.nix;
 
-          home-manager.sharedModules = [ { home.stateVersion = "25.05"; } ];
+          home-manager.sharedModules = [{ home.stateVersion = "25.05"; }];
         }
       ];
     };
