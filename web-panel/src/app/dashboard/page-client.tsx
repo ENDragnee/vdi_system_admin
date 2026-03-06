@@ -13,17 +13,12 @@ import {
   HardDrive,
   Activity,
   LogOut,
-  Plus,
   ArrowUpDown,
   AlertTriangle,
 } from "lucide-react";
-import { auth } from "../../lib/auth";
-import { signOut } from "@/lib/actions/auth-actions";
+import { signOut } from "next-auth/react";
+import { Session } from "next-auth";
 
-type Session = typeof auth.$Infer.Session;
-
-// --- Type Definition for Instance Data ---
-// This should match the structure returned by your /api/instances endpoint.
 interface InstanceData {
   id: string;
   name: string;
@@ -254,7 +249,7 @@ export default function DashboardPage({ session }: { session: Session }) {
               <span className="text-xl font-bold text-white">VDS Admin</span>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-slate-400 text-sm">{session.user.name}</span>
+              <span className="text-slate-400 text-sm">{session?.user?.name}</span>
               <Button
                 variant="ghost"
                 size="sm"

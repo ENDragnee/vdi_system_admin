@@ -19,3 +19,5 @@ export async function validate_password(
 ): Promise<boolean> {
   return await compare(password, hashed_password);
 }
+
+console.log(hash_password("12345678"));

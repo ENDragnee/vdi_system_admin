@@ -11,11 +11,10 @@ import { Server } from "lucide-react"
 interface SignUpViewProps {
   onSubmit: (e: React.FormEvent) => Promise<void>
   isLoading: boolean
-  handleSocial: (provider: "google" | "apple") => Promise<void>
   error?: string
 }
 
-export function SignUpView({ onSubmit, isLoading, handleSocial, error }: SignUpViewProps) {
+export function SignUpView({ onSubmit, isLoading, error }: SignUpViewProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-md">
@@ -35,7 +34,7 @@ export function SignUpView({ onSubmit, isLoading, handleSocial, error }: SignUpV
             <CardDescription className="text-slate-400">Create a new account to get started</CardDescription>
           </CardHeader>
           <CardContent>
-            <SignUpForm onSubmit={onSubmit} isLoading={isLoading} handleSocial={handleSocial} />
+            <SignUpForm onSubmit={onSubmit} isLoading={isLoading} />
           </CardContent>
         </Card>
 

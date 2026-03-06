@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Server, Shield, BarChart3, Zap, CheckCircle, Activity } from 'lucide-react';
 
 export default function Home() {
@@ -16,12 +16,12 @@ export default function Home() {
               <span className="text-xl font-bold text-white">VDS Admin</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/auth?view=signin">
+              <Link href="/auth">
                 <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-800">
                   Sign In
                 </Button>
               </Link>
-              <Link href="/auth?view=signup">
+              <Link href="/auth">
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   Get Started
                 </Button>
@@ -153,7 +153,7 @@ export default function Home() {
             <p className="text-xl text-slate-400 mb-8">
               Join thousands of administrators monitoring their virtual desktop infrastructure with VDS Admin.
             </p>
-            <Link href="/auth?view=signup">
+            <Link href="/auth">
               <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8">
                 Get Started Now
               </Button>

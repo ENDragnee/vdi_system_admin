@@ -9,11 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 interface SignInViewProps {
   onSubmit: (e: React.FormEvent) => Promise<void>
   isLoading: boolean
-  handleSocial: (provider: "google" | "apple") => Promise<void>
   error?: string
 }
 
-export function SignInView({ onSubmit, isLoading, handleSocial, error }: SignInViewProps) {
+export function SignInView({ onSubmit, isLoading, error }: SignInViewProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-md">
@@ -33,7 +32,7 @@ export function SignInView({ onSubmit, isLoading, handleSocial, error }: SignInV
             <CardDescription className="text-slate-400">Enter your credentials to access your account</CardDescription>
           </CardHeader>
           <CardContent>
-            <SignInForm onSubmit={onSubmit} isLoading={isLoading} handleSocial={handleSocial} />
+            <SignInForm onSubmit={onSubmit} isLoading={isLoading} />
           </CardContent>
         </Card>
 
