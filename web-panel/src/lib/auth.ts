@@ -42,7 +42,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user) {
-          throw new Error("Invalid University ID");
+          throw new Error("Invalid University ID or Password!");
         }
 
         if (!user?.password) {
@@ -56,7 +56,7 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isValid) {
-          throw new Error("Invalid password");
+          throw new Error("Invalid University ID or Password!");
         }
 
         // 4. Return user (goes into JWT callback)

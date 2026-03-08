@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-import Link from "next/link"
 import { SignInForm } from "@/components/signin-form"
 import { AuthErrorDisplay } from "@/components/auth-error-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,13 +34,6 @@ export function SignInView({ onSubmit, isLoading, error }: SignInViewProps) {
             <SignInForm onSubmit={onSubmit} isLoading={isLoading} />
           </CardContent>
         </Card>
-
-        <div className="mt-8 text-center text-sm">
-          <span className="text-slate-400">Don't have an account? </span>
-          <Link href="/auth?view=signup" className="text-blue-400 hover:text-blue-300 font-medium">
-            Sign up
-          </Link>
-        </div>
       </div>
     </div>
   )
