@@ -23,29 +23,12 @@ model User {
   labId String?
   lab   Lab?    @relation(fields: [labId], references: [id])
 
-  sessions Session[]
-  logs     Log[]
+  logs Log[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  ipAddress    String?
-  userAgent    String?
-  expiresAt    DateTime
-  sessionToken String   @unique
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("sessions")
 }
 
 model Lab {
