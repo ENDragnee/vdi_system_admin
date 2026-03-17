@@ -1,23 +1,14 @@
-import { auth } from "@/lib/auth";
-import AuthClientPage from "./auth-client";
-import { headers } from "next/headers";
+import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import AuthClientPage from "./auth-client";
+import { getServerSession } from "next-auth";
 
-interface AuthPageProps {
-  searchParams: Promise<{ view?: string }>;
-}
-
-export default async function AuthPage({ searchParams }: AuthPageProps) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+export default async function AuthPage() {
+  const session = await getServerSession(authOptions);
 
   if (session) {
     redirect("/dashboard");
   }
 
-  const params = await searchParams;
-  const isSignIn = params.view !== "signup";
-
-  return <AuthClientPage isSignIn={isSignIn} />;
+  return <AuthClientPage />;
 }

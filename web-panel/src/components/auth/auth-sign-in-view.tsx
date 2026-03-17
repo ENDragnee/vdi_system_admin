@@ -1,19 +1,17 @@
 "use client"
 
 import type React from "react"
-import Link from "next/link"
-import { SignInForm } from "@/components/signin-form"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
+import { SignInForm } from "./signin-form"
+import { AuthErrorDisplay } from "./auth-error-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface SignInViewProps {
   onSubmit: (e: React.FormEvent) => Promise<void>
   isLoading: boolean
-  handleSocial: (provider: "google" | "apple") => Promise<void>
   error?: string
 }
 
-export function SignInView({ onSubmit, isLoading, handleSocial, error }: SignInViewProps) {
+export function SignInView({ onSubmit, isLoading, error }: SignInViewProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-md">
@@ -33,16 +31,9 @@ export function SignInView({ onSubmit, isLoading, handleSocial, error }: SignInV
             <CardDescription className="text-slate-400">Enter your credentials to access your account</CardDescription>
           </CardHeader>
           <CardContent>
-            <SignInForm onSubmit={onSubmit} isLoading={isLoading} handleSocial={handleSocial} />
+            <SignInForm onSubmit={onSubmit} isLoading={isLoading} />
           </CardContent>
         </Card>
-
-        <div className="mt-8 text-center text-sm">
-          <span className="text-slate-400">Don't have an account? </span>
-          <Link href="/auth?view=signup" className="text-blue-400 hover:text-blue-300 font-medium">
-            Sign up
-          </Link>
-        </div>
       </div>
     </div>
   )

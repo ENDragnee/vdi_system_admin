@@ -4,17 +4,14 @@ import type React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 
 export function SignInForm({
   onSubmit,
   isLoading = false,
-  handleSocial,
 }: {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>
   isLoading?: boolean
-  handleSocial: (provider: "google" | "apple") => Promise<void>
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-6">

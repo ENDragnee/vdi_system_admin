@@ -1,42 +1,16 @@
 "use client";
 
 import type React from "react";
-
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { signIn } from "next-auth/react";
+import { SignInView } from "@/components/auth/auth-sign-in-view";
+import { AuthErrorDisplay } from "@/components/auth/auth-error-display";
 import { useRouter } from "next/navigation";
-import { signIn, signInSocial, signUp } from "@/lib/actions/auth-actions";
-import { SignInView } from "@/components/auth-sign-in-view";
-import { SignUpView } from "@/components/auth-sign-up-view";
-import { AuthErrorDisplay } from "@/components/auth-error-display";
 
-interface AuthClientPageProps {
-  isSignIn: boolean;
-}
-
-export default function AuthClientPage({
-  isSignIn: initialIsSignIn,
-}: AuthClientPageProps) {
-  const [isSignIn, setIsSignIn] = useState(initialIsSignIn);
+export default function AuthClientPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
-
-  const handleSocialAuth = async (provider: "google" | "apple") => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      await signInSocial(provider);
-    } catch (err) {
-      setError(
-        `Error authenticating with ${provider}: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,34 +20,24 @@ export default function AuthClientPage({
     const formData = new FormData(e.currentTarget as HTMLFormElement);
     const formEmail = formData.get("email") as string;
     const formPassword = formData.get("password") as string;
-    console.log("heei fp", formPassword);
-
-    const firstName = formData.get("firstName") as string;
-    const lastName = formData.get("lastName") as string;
-    const formName = firstName && lastName ? `${firstName} ${lastName}` : "";
 
     try {
-      if (isSignIn) {
-        const result = await signIn(formEmail, formPassword);
-        if (!result.user) {
-          setError("Invalid email or password");
-        } else {
-          // Navigate client-side immediately after successful sign in
-          router.push("/dashboard");
-        }
-      } else {
-        const result = await signUp(formEmail, formPassword, formName);
-        if (!result.user) {
-          setError("Failed to create account");
-        } else {
-          // Navigate client-side immediately after successful sign up
-          router.push("/dashboard");
-        }
+      const res = await signIn("credentials", {
+        email: formEmail,
+        password: formPassword,
+        redirect: false,
+      });
+
+      if (res?.error) {
+        setError(res.error);
+      } else if (res?.ok) {
+        router.push('/dashboard');
+        router.refresh();
       }
+
     } catch (err) {
       setError(
-        `Authentication error: ${
-          err instanceof Error ? err.message : "Unknown error"
+        `Authentication error: ${err instanceof Error ? err.message : "Unknown error"
         }`
       );
     } finally {
@@ -81,20 +45,20 @@ export default function AuthClientPage({
     }
   };
 
-  // Keep local isSignIn in sync with prop when the URL/search params change
   useEffect(() => {
-    setIsSignIn(initialIsSignIn);
-  }, [initialIsSignIn]);
+    // start timer
+    const timer = setTimeout(() => {
+      setError("");
+    }, 3000);
+
+    // cleanup when component unmounts
+    return () => clearTimeout(timer);
+  }, [error]);
 
   return (
     <>
       <AuthErrorDisplay error={error} />
-
-      {isSignIn ? (
-        <SignInView onSubmit={handleEmailAuth} isLoading={isLoading} handleSocial={handleSocialAuth} />
-      ) : (
-        <SignUpView onSubmit={handleEmailAuth} isLoading={isLoading} handleSocial={handleSocialAuth}/>
-      )}
+      <SignInView onSubmit={handleEmailAuth} isLoading={isLoading} />
     </>
   );
 }

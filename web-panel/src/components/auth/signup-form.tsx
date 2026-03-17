@@ -11,11 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 export function SignUpForm({
   onSubmit,
   isLoading = false,
-  handleSocial,
 }: {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>
   isLoading?: boolean
-  handleSocial: (provider: "google" | "apple") => Promise<void>
 }) {
   const [formData, setFormData] = useState({
     email: "",
@@ -136,9 +134,8 @@ export function SignUpForm({
             required
             value={formData.email}
             onChange={handleChange}
-            className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
-              errors.email ? "border-red-500" : ""
-            }`}
+            className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${errors.email ? "border-red-500" : ""
+              }`}
           />
           {errors.email && <p className="text-sm text-red-400">{errors.email}</p>}
         </div>
@@ -158,9 +155,8 @@ export function SignUpForm({
             required
             value={formData.password}
             onChange={handleChange}
-            className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
-              errors.password ? "border-red-500" : ""
-            }`}
+            className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${errors.password ? "border-red-500" : ""
+              }`}
           />
           {errors.password && <p className="text-sm text-red-400">{errors.password}</p>}
         </div>
@@ -180,9 +176,8 @@ export function SignUpForm({
             required
             value={formData.confirmPassword}
             onChange={handleChange}
-            className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
-              errors.confirmPassword ? "border-red-500" : ""
-            }`}
+            className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${errors.confirmPassword ? "border-red-500" : ""
+              }`}
           />
           {errors.confirmPassword && <p className="text-sm text-red-400">{errors.confirmPassword}</p>}
         </div>
@@ -221,27 +216,6 @@ export function SignUpForm({
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-slate-800/50 px-2 text-slate-400 tracking-wider">Or continue with</span>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Button
-          type="button"
-          onClick={() => handleSocial("google")}
-          variant="outline"
-          disabled={isLoading}
-          className="border-slate-600 hover:border-blue-600 hover:bg-blue-600/10 bg-transparent text-slate-200"
-        >
-          Google
-        </Button>
-        <Button
-          type="button"
-          onClick={() => handleSocial("apple")}
-          variant="outline"
-          disabled={isLoading}
-          className="border-slate-600 hover:border-blue-600 hover:bg-blue-600/10 bg-transparent text-slate-200"
-        >
-          Apple
-        </Button>
       </div>
     </form>
   )
