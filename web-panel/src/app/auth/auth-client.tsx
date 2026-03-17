@@ -3,8 +3,8 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { SignInView } from "@/components/auth-sign-in-view";
-import { AuthErrorDisplay } from "@/components/auth-error-display";
+import { SignInView } from "@/components/auth/auth-sign-in-view";
+import { AuthErrorDisplay } from "@/components/auth/auth-error-display";
 import { useRouter } from "next/navigation";
 
 export default function AuthClientPage() {

@@ -3,8 +3,8 @@
 import type React from "react"
 
 import Link from "next/link"
-import { SignUpForm } from "@/components/signup-form"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
+import { SignUpForm } from "./signup-form"
+import { AuthErrorDisplay } from "./auth-error-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Server } from "lucide-react"
 

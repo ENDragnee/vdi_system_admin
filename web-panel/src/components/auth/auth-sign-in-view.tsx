@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { SignInForm } from "@/components/signin-form"
-import { AuthErrorDisplay } from "@/components/auth-error-display"
+import { SignInForm } from "./signin-form"
+import { AuthErrorDisplay } from "./auth-error-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface SignInViewProps {
