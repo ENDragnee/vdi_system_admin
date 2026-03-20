@@ -5,12 +5,12 @@ import { Server, Shield, BarChart3, Zap, CheckCircle, Activity } from 'lucide-re
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen">
       <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
                 <Server className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold text-white">VDS Admin</span>
@@ -22,7 +22,7 @@ export default function Home() {
                 </Button>
               </Link>
               <Link href="/auth">
-                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Button className="bg-gradient-to-br from-primary to-accent hover:bg-blue-700">
                   Get Started
                 </Button>
               </Link>
@@ -34,14 +34,14 @@ export default function Home() {
       <main>
         <section className="py-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto text-center">
-            <div className="inline-flex items-center space-x-2 bg-blue-950/50 border border-blue-800 rounded-full px-4 py-2 mb-8">
+            <div className="inline-flex items-center space-x-2 bg-primary/30 border border-primary rounded-full px-4 py-2 mb-8">
               <Activity className="w-4 h-4 text-blue-400" />
               <span className="text-sm text-blue-300">Real-time Monitoring</span>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
               Manage Your Virtual Desktops
               <br />
-              <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-400 to-cyan-400">
+              <span className="text-transparent bg-clip-text bg-linear-to-r bg-gradient-to-br from-primary to-accent">
                 With Confidence
               </span>
             </h1>
@@ -51,7 +51,7 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/dashboard">
-                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8">
+                <Button size="lg" className="bg-primary/70 hover:bg-primary/90 text-lg px-8 cursor-pointer">
                   Start Monitoring
                 </Button>
               </Link>
@@ -59,7 +59,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-900/50">
+        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-900">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
