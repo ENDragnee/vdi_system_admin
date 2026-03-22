@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { BookOpen, Cpu, HardDrive, Activity, TrendingUp, Eye, Download } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BookOpen, Cpu, Activity, TrendingUp, Eye, Download } from 'lucide-react';
 
 const courseMetrics = [
   { course: 'CS101', activeStudents: 24, vmInstances: 8, avgCpuUsage: 45 },

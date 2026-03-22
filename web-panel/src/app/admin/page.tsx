@@ -60,12 +60,10 @@ export default function AdminOverview() {
           const Icon = stat.icon;
           return (
             <Card key={stat.label} className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
-              <div className={`h-2 bg-card-foreground ${stat.color}`} />
+              {/* <div className={`h-2 bg-card-foreground ${stat.color}`} />*/}
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-lg bg-gradient-to-br ${stat.color} bg-opacity-10`}>
-                    <Icon className="w-6 h-6 text-primary" />
-                  </div>
+                  <Icon className="w-6 h-6 text-primary" />
                   <Badge variant="secondary" className="text-green-700 bg-green-100 hover:bg-green-100">
                     {stat.change}
                   </Badge>
