@@ -106,6 +106,4 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === "development",
 };
 
-// DO NOT USE the `export const { handlers, auth }` v5 syntax here!
-// Just export a default NextAuth handler if needed, or rely on standard route.ts setup.
 export default NextAuth(authOptions);

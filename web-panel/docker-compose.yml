@@ -31,10 +31,47 @@ services:
     image: apache/kafka:4.1.0
     container_name: vdi_kafka
     restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # 1. Listen on all interfaces for External, Internal, and Controller traffic
+      KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9092,INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+
+      # 2. THIS IS THE FIX: Tell external clients (the VM) to route to 192.168.8.146
+      #    Tell internal Docker clients (Kafka-UI) to route to 'kafka:29092'
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://192.168.8.146:9092,INTERNAL://kafka:29092
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
     ports:
       - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     networks:
       - vdi_network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: vdi_kafka_ui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: vdi_cluster
+      # UI talks to Kafka over the internal Docker network
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - vdi_network
+    depends_on:
+      - kafka
 
   nextjs_app:
     build:
@@ -55,6 +92,7 @@ services:
 volumes:
   vdi_admin_postgres:
   influxdb_data:
+  kafka_data:
 
 networks:
   vdi_network:
