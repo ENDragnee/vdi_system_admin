@@ -8,28 +8,34 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  ADMIN
-  FACULTY
-}
-
 model User {
   id       String  @id @default(cuid())
   name     String?
   email    String  @unique
   password String
-  role     Role    @default(FACULTY)
 
   labId String?
   lab   Lab?    @relation(fields: [labId], references: [id])
 
-  sessions Session[]
-  logs     Log[]
+  sessions        Session[]
+  logs            Log[]
+  roleUsers       RoleUser[]
+  userPersmission UserPersmission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+}
+
+model UserPersmission {
+  id String @id @default(cuid())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  permissionId String?
+  permission   Permission? @relation(fields: [permissionId], references: [id], onDelete: SetNull)
 }
 
 model Session {
@@ -48,13 +54,65 @@ model Session {
   @@map("sessions")
 }
 
+model Role {
+  id        String @id @default(cuid())
+  name      String
+  guardName String
+
+  roleUsers       RoleUser[]
+  permissionRoles PermissionRole[]
+
+  @@map("roles")
+}
+
+model RoleUser {
+  id String @id @default(cuid())
+
+  userId String
+  users  User   @relation(fields: [userId], references: [id])
+
+  roleId String
+  roles  Role   @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@map("role_users")
+}
+
+model PermissionRole {
+  id String @id @default(cuid())
+
+  roleId String
+  roles  Role   @relation(fields: [roleId], references: [id])
+
+  permissionId String
+  permissions  Permission @relation(fields: [permissionId], references: [id])
+
+  @@map("permission_roles")
+}
+
+model Permission {
+  id        String @id @default(cuid())
+  name      String
+  guardName String
+
+  permissionRoles PermissionRole[]
+  userPersmission UserPersmission[]
+
+  moduleId String
+  modules  Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@map("permissions")
+}
+
 model Lab {
   id          String  @id @default(cuid())
   name        String  @unique
   description String?
 
-  users User[]
-  vms   VM[]
+  users      User[]
+  vms        VM[]
+  logs       Log[]
+  vmPackages VMPackage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -115,6 +173,9 @@ model VMPackage {
   vm      VM      @relation(fields: [vmId], references: [id], onDelete: Cascade)
   package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
+  labId String?
+  lab   Lab?    @relation(fields: [labId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -122,6 +183,17 @@ model VMPackage {
   @@index([vmId])
   @@index([status])
   @@map("vm_packages")
+}
+
+model Module {
+  id       String  @id @default(cuid())
+  name     String
+  slug     String
+  isActive Boolean @default(false)
+
+  permissions Permission[]
+
+  @@map("modules")
 }
 
 enum LogSeverity {
@@ -168,6 +240,9 @@ model Log {
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  labId String?
+  lab   Lab?    @relation(fields: [labId], references: [id], onDelete: SetNull)
 
   ipAddress String?
 
