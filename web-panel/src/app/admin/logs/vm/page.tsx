@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -6,10 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, Filter, Server, Play, Square, Zap } from 'lucide-react';
+import { Search, Download, Filter, Server, Play, Square, Zap, ChevronRight } from 'lucide-react';
 
 interface VMLogEntry {
   id: string;
+  labId: string;
   vmName: string;
   timestamp: string;
   event: string;
@@ -18,10 +18,34 @@ interface VMLogEntry {
   source: string;
 }
 
+const mockLabs = [
+  { id: 'lab-001', name: 'Lab A - Development' },
+  { id: 'lab-002', name: 'Lab B - Production' },
+  { id: 'lab-003', name: 'Lab C - Testing' },
+];
+
+const mockInstances: Record<string, Array<{ id: string; name: string }>> = {
+  'lab-001': [
+    { id: 'vm-001', name: 'Dev-Server-01' },
+    { id: 'vm-002', name: 'Dev-Server-02' },
+    { id: 'vm-003', name: 'Dev-Database' },
+  ],
+  'lab-002': [
+    { id: 'vm-004', name: 'Prod-Web-01' },
+    { id: 'vm-005', name: 'Prod-Web-02' },
+    { id: 'vm-006', name: 'Prod-Database' },
+  ],
+  'lab-003': [
+    { id: 'vm-007', name: 'Test-Server-01' },
+    { id: 'vm-008', name: 'Test-Server-02' },
+  ],
+};
+
 const mockVMLogs: VMLogEntry[] = [
   {
     id: 'vmlog-001',
-    vmName: 'Database-Primary',
+    labId: 'lab-002',
+    vmName: 'Prod-Database',
     timestamp: '2024-03-17 15:45:32',
     event: 'HIGH_CPU_USAGE',
     severity: 'critical',
@@ -30,7 +54,8 @@ const mockVMLogs: VMLogEntry[] = [
   },
   {
     id: 'vmlog-002',
-    vmName: 'Development-01',
+    labId: 'lab-001',
+    vmName: 'Dev-Server-01',
     timestamp: '2024-03-17 15:38:15',
     event: 'SERVICE_STARTED',
     severity: 'info',
@@ -39,7 +64,8 @@ const mockVMLogs: VMLogEntry[] = [
   },
   {
     id: 'vmlog-003',
-    vmName: 'Analytics-Engine',
+    labId: 'lab-003',
+    vmName: 'Test-Server-01',
     timestamp: '2024-03-17 15:32:48',
     event: 'MEMORY_WARNING',
     severity: 'warning',
@@ -48,7 +74,8 @@ const mockVMLogs: VMLogEntry[] = [
   },
   {
     id: 'vmlog-004',
-    vmName: 'Testing-Web-Server',
+    labId: 'lab-003',
+    vmName: 'Test-Server-02',
     timestamp: '2024-03-17 15:25:20',
     event: 'DISK_ERROR',
     severity: 'critical',
@@ -57,7 +84,8 @@ const mockVMLogs: VMLogEntry[] = [
   },
   {
     id: 'vmlog-005',
-    vmName: 'Database-Primary',
+    labId: 'lab-002',
+    vmName: 'Prod-Database',
     timestamp: '2024-03-17 15:18:10',
     event: 'BACKUP_COMPLETED',
     severity: 'info',
@@ -66,7 +94,8 @@ const mockVMLogs: VMLogEntry[] = [
   },
   {
     id: 'vmlog-006',
-    vmName: 'Development-01',
+    labId: 'lab-001',
+    vmName: 'Dev-Server-01',
     timestamp: '2024-03-17 15:10:55',
     event: 'NETWORK_LATENCY',
     severity: 'warning',
@@ -75,49 +104,58 @@ const mockVMLogs: VMLogEntry[] = [
   },
   {
     id: 'vmlog-007',
-    vmName: 'Legacy-App-Server',
+    labId: 'lab-002',
+    vmName: 'Prod-Web-01',
     timestamp: '2024-03-17 15:05:33',
     event: 'SERVICE_STOPPED',
     severity: 'warning',
-    message: 'Oracle Database service stopped unexpectedly',
+    message: 'Service stopped unexpectedly',
     source: 'Service Manager',
   },
   {
     id: 'vmlog-008',
-    vmName: 'Analytics-Engine',
+    labId: 'lab-003',
+    vmName: 'Test-Server-01',
     timestamp: '2024-03-17 14:58:12',
     event: 'PROCESS_RESTARTED',
     severity: 'info',
-    message: 'Analytics daemon restarted after crash - PID 4521',
+    message: 'Daemon restarted after crash - PID 4521',
     source: 'Process Monitor',
   },
   {
     id: 'vmlog-009',
-    vmName: 'Backup-Storage',
+    labId: 'lab-002',
+    vmName: 'Prod-Web-02',
     timestamp: '2024-03-17 14:52:45',
     event: 'STORAGE_FULL',
     severity: 'critical',
-    message: 'Backup storage reached 98% capacity - urgent cleanup needed',
+    message: 'Storage reached 98% capacity - urgent cleanup needed',
     source: 'Storage Monitor',
   },
   {
     id: 'vmlog-010',
-    vmName: 'Testing-Web-Server',
+    labId: 'lab-001',
+    vmName: 'Dev-Database',
     timestamp: '2024-03-17 14:45:20',
     event: 'CONFIG_UPDATED',
     severity: 'info',
-    message: 'Nginx configuration reloaded successfully',
+    message: 'Configuration reloaded successfully',
     source: 'Configuration Manager',
   },
 ];
 
 export default function VMLogs() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLab, setSelectedLab] = useState<string | null>(null);
   const [selectedVM, setSelectedVM] = useState<string | null>(null);
   const [selectedSeverity, setSelectedSeverity] = useState<string | null>(null);
+  const [showAllLogs, setShowAllLogs] = useState(true);
   const [logs, setLogs] = useState<VMLogEntry[]>(mockVMLogs);
 
-  const vmList = Array.from(new Set(logs.map((log) => log.vmName)));
+  const availableInstances = selectedLab ? mockInstances[selectedLab] : [];
+  const vmList = selectedLab
+    ? availableInstances.map(i => i.name)
+    : Array.from(new Set(logs.map((log) => log.vmName)));
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
@@ -125,10 +163,11 @@ export default function VMLogs() {
       log.event.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.message.toLowerCase().includes(searchTerm.toLowerCase());
 
+    const matchesLab = !selectedLab || log.labId === selectedLab;
     const matchesVM = !selectedVM || log.vmName === selectedVM;
     const matchesSeverity = !selectedSeverity || log.severity === selectedSeverity;
 
-    return matchesSearch && matchesVM && matchesSeverity;
+    return matchesSearch && matchesLab && matchesVM && matchesSeverity;
   });
 
   const getSeverityIcon = (severity: string) => {
@@ -170,7 +209,75 @@ export default function VMLogs() {
       {/* Header */}
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-2">VM Logs</h1>
-        <p className="text-muted-foreground">Monitor virtual machine events and performance</p>
+        <p className="text-muted-foreground">
+          {showAllLogs
+            ? 'Monitor virtual machine events and performance across all labs'
+            : selectedVM
+              ? `VM Logs for ${selectedVM}`
+              : 'Select a lab to view VM logs'}
+        </p>
+      </div>
+
+      {/* Lab Selection */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground mb-3">Select Lab</h3>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={showAllLogs ? 'default' : 'outline'}
+              onClick={() => {
+                setShowAllLogs(true);
+                setSelectedLab(null);
+                setSelectedVM(null);
+              }}
+              className={showAllLogs ? 'bg-primary text-primary-foreground' : 'border-border'}
+            >
+              View All
+            </Button>
+            {mockLabs.map((lab) => (
+              <Button
+                key={lab.id}
+                variant={selectedLab === lab.id ? 'default' : 'outline'}
+                onClick={() => {
+                  setShowAllLogs(false);
+                  setSelectedLab(lab.id);
+                  setSelectedVM(null);
+                }}
+                className={selectedLab === lab.id ? 'bg-primary text-primary-foreground' : 'border-border'}
+              >
+                {lab.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Instance Selection - Only show if lab is selected */}
+        {selectedLab && availableInstances.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Select Instance (Optional)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Button
+                variant={selectedVM === null ? 'default' : 'outline'}
+                onClick={() => setSelectedVM(null)}
+                className={selectedVM === null ? 'bg-primary text-primary-foreground' : 'border-border'}
+              >
+                All Instances
+              </Button>
+              {availableInstances.map((instance) => (
+                <Button
+                  key={instance.id}
+                  variant={selectedVM === instance.name ? 'default' : 'outline'}
+                  onClick={() => setSelectedVM(instance.name)}
+                  className={`justify-start gap-2 ${selectedVM === instance.name ? 'bg-primary text-primary-foreground' : 'border-border'}`}
+                >
+                  <Server className="w-4 h-4" />
+                  {instance.name}
+                  {selectedVM === instance.name && <ChevronRight className="w-4 h-4 ml-auto" />}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
