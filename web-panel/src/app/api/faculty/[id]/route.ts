@@ -10,7 +10,16 @@ export async function GET(
     const { id } = params;
 
     const faculty = await prisma.user.findUnique({
-      where: { id },
+      where: { 
+        id,
+        roleUsers: {
+          some: {
+            roles: {
+              guardName: 'FACULTY',
+            },
+          },
+        },
+      },
       include: {
         lab: true,
       },
@@ -20,13 +29,6 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: 'Faculty member not found' },
         { status: 404 }
-      );
-    }
-
-    if (faculty.role !== 'FACULTY') {
-      return NextResponse.json(
-        { success: false, error: 'User is not a faculty member' },
-        { status: 400 }
       );
     }
 
@@ -51,20 +53,22 @@ export async function PUT(
 
     // Check if faculty exists
     const existingFaculty = await prisma.user.findUnique({
-      where: { id },
+      where: {
+        id,
+        roleUsers: {
+          some: {
+            roles: {
+              guardName: 'FACULTY',
+            },
+          },
+        },
+      },
     });
 
     if (!existingFaculty) {
       return NextResponse.json(
         { success: false, error: 'Faculty member not found' },
         { status: 404 }
-      );
-    }
-
-    if (existingFaculty.role !== 'FACULTY') {
-      return NextResponse.json(
-        { success: false, error: 'User is not a faculty member' },
-        { status: 400 }
       );
     }
 
@@ -113,21 +117,23 @@ export async function DELETE(
     const { id } = await params;
 
     // Check if faculty exists
-    const existingFaculty = await prisma.user.findUnique({
-      where: { id },
+    const existingFaculty = await prisma.user.findFirst({
+      where: {
+        id,
+        roleUsers: {
+          some: {
+            roles: {
+              guardName: 'FACULTY',
+            },
+          },
+        },
+      },
     });
 
     if (!existingFaculty) {
       return NextResponse.json(
         { success: false, error: 'Faculty member not found' },
         { status: 404 }
-      );
-    }
-
-    if (existingFaculty.role !== 'FACULTY') {
-      return NextResponse.json(
-        { success: false, error: 'User is not a faculty member' },
-        { status: 400 }
       );
     }
 
