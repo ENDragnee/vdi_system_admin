@@ -125,7 +125,7 @@ model VM {
   id        String @id @default(cuid())
   proxmoxId Int    @unique
   hostname  String
-  ipAddress String @unique
+  // ipAddress String @unique
 
   labId String
   lab   Lab    @relation(fields: [labId], references: [id])
@@ -137,7 +137,7 @@ model VM {
 
   @@index([proxmoxId])
   @@index([hostname])
-  @@index([ipAddress])
+  // @@index([ipAddress])
   @@map("vms")
 }
 
