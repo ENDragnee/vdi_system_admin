@@ -5,7 +5,7 @@ import { prisma } from "./lib/prisma";
 async function main() {
   console.log(`Start seeding users and roles... 🌱`);
 
-  const roleNames = ["ADMIN", "FACULTY", "USER"];
+  const roleNames = ["admin", "faculty", "user"];
   const roleMap: Record<string, string> = {};
 
   // 1. Ensure roles exist in the database first
@@ -17,13 +17,13 @@ async function main() {
     if (!role) {
       role = await prisma.role.create({
         data: {
-          name: roleName.charAt(0) + roleName.slice(1).toLowerCase(),
-          guardName: roleName,
+          name: roleName.charAt(0) + roleName.slice(1).toLowerCase(), // "Admin", "Faculty", "User"
+          guardName: roleName.toUpperCase(),
         },
       });
     }
 
-    // Store the role ID so we can connect it to users later
+    // Store the role ID so we can cleanly connect it to users later
     roleMap[roleName] = role.id;
   }
 
@@ -32,48 +32,53 @@ async function main() {
       name: "Admin Superuser",
       email: "admin@university.edu",
       password: "securepassword123",
-      roles: ["ADMIN", "USER", "FACULTY"],
+      roles: ["admin", "user", "faculty"],
     },
     {
       name: "John Doe",
       email: "faculty@university.edu",
       password: "facultypassword123",
-      roles: ["USER", "FACULTY"],
+      roles: ["user", "faculty"],
     },
     {
       name: "Jane Smith",
       email: "jane.smith@university.edu",
       password: "password123",
-      roles: ["USER", "FACULTY"],
+      roles: ["user", "faculty"], // Explicitly granting Faculty role
     },
   ];
 
   for (const u of users) {
     const hashedPassword = await hash_password(u.password);
 
-    // 2. Upsert the user (Handling only the user data)
+    // Pre-map the roles array into the exact format Prisma's nested writes expect
+    const roleConnections = u.roles.map((roleName) => ({
+      roleId: roleMap[roleName],
+    }));
+
+    // 2. Upsert the user AND sync their roles in one atomic transaction!
     const user = await prisma.user.upsert({
       where: { email: u.email },
       update: {
         name: u.name,
-        // Uncomment if you want the seeder to reset passwords on re-runs
-        // password: hashedPassword,
+        // Optional: password: hashedPassword,
+        
+        // SYNC ROLES: This clears out old roles and applies the exact roles from the array above
+        roleUsers: {
+          deleteMany: {}, // Deletes existing connections in the join table
+          create: roleConnections, // Creates the new explicit connections
+        },
       },
       create: {
         email: u.email,
         name: u.name,
         password: hashedPassword,
+        
+        // CREATE ROLES: Simply connect the roles upon user creation
+        roleUsers: {
+          create: roleConnections,
+        },
       },
-    });
-
-    // 3. Sync Roles safely using your new @@unique constraint!
-    // skipDuplicates: true ensures that existing roles are ignored and only missing roles are added.
-    await prisma.roleUser.createMany({
-      data: u.roles.map((roleName) => ({
-        userId: user.id,
-        roleId: roleMap[roleName],
-      })),
-      skipDuplicates: true,
     });
 
     console.log(`Created/Updated user: ${user.name} (${user.email})`);

@@ -60,10 +60,10 @@ export default withAuth(
 // 6. Define ALL paths that require authentication here.
 export const config = {
   matcher: [
-    "/admin/:path*",
+    // "/admin/:path*",
     "/api/admin/:path*",
     "/faculty/:path*",
-    "/api/faculty/:path*",
+//    "/api/faculty/:path*",
     "/labs/:path*",
     "/dashboard/:path*",
     "/api/protected/:path*",

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { hash_password} from "@/lib/password-utils";
 
 export async function GET() {
   try {
     const faculty = await prisma.user.findMany({
       where: {
-        role: 'FACULTY',
+        roleUsers: {
+          some: {
+            roles: {
+              name: 'faculty',
+            },
+          },
+        },
       },
       include: {
         lab: true,
@@ -24,6 +31,21 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    let facultyRole = await prisma.role.findFirst({
+      where: {
+        name: 'faculty',
+      }
+    });
+    
+    if (!facultyRole) {
+      facultyRole = await prisma.role.create({
+        data: {
+          name: 'faculty',
+          guardName: 'FACULTY',
+        }
+      })
+    }
+
     const body = await request.json();
     const { name, email, password, labId} = body;
 
@@ -31,6 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({success: false, error: "Email and Password are Required!"}, {status: 400});
     }
 
+    const hashed_passwd = await hash_password(password); 
     const existingFaculty = await prisma.user.findUnique({
       where: { email },
     })
@@ -43,12 +66,22 @@ export async function POST(request: NextRequest) {
       data: {
         name: name || email.split('@')[0],
         email,
-        password,
-        role: 'FACULTY',
+        password: hashed_passwd, 
         labId: labId || null,
+
+        roleUsers: {
+          create: {
+            roleId: facultyRole.id,
+          }
+        }
       }, 
       include: {
         lab: true,
+        roleUsers: {
+          include: {
+            roles: true,
+          }
+        }
       },
     });
 

@@ -1,10 +1,33 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, AreaChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
-import { Activity, Wifi, TrendingUp, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
+import { Activity, Wifi, TrendingUp, AlertCircle, ChevronRight, Server } from 'lucide-react';
+
+const mockLabs = [
+  { id: 'lab-001', name: 'Lab A - Development' },
+  { id: 'lab-002', name: 'Lab B - Production' },
+  { id: 'lab-003', name: 'Lab C - Testing' },
+];
+
+const mockInstances: Record<string, Array<{ id: string; name: string }>> = {
+  'lab-001': [
+    { id: 'vm-001', name: 'Dev-Server-01' },
+    { id: 'vm-002', name: 'Dev-Server-02' },
+    { id: 'vm-003', name: 'Dev-Database' },
+  ],
+  'lab-002': [
+    { id: 'vm-004', name: 'Prod-Web-01' },
+    { id: 'vm-005', name: 'Prod-Web-02' },
+    { id: 'vm-006', name: 'Prod-Database' },
+  ],
+  'lab-003': [
+    { id: 'vm-007', name: 'Test-Server-01' },
+    { id: 'vm-008', name: 'Test-Server-02' },
+  ],
+};
 
 const metricsData = [
   { time: '00:00', cpu: 35, memory: 45, network: 120, disk: 62 },
@@ -43,6 +66,9 @@ const processData = [
 ];
 
 export default function LiveMetrics() {
+  const [selectedLab, setSelectedLab] = useState<string | null>(null);
+  const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
+  const [showAllMetrics, setShowAllMetrics] = useState(true);
   const [isLive, setIsLive] = useState(true);
   const [metrics, setMetrics] = useState(metricsData);
   const [lastUpdate, setLastUpdate] = useState(new Date());
@@ -71,6 +97,23 @@ export default function LiveMetrics() {
   }, [isLive]);
 
   const currentMetrics = metrics[metrics.length - 1];
+  const availableInstances = selectedLab ? mockInstances[selectedLab] : [];
+
+  const handleLabSelect = (labId: string) => {
+    setSelectedLab(labId);
+    setSelectedInstance(null);
+    setShowAllMetrics(false);
+  };
+
+  const handleInstanceSelect = (instanceId: string) => {
+    setSelectedInstance(instanceId);
+  };
+
+  const handleViewAll = () => {
+    setShowAllMetrics(true);
+    setSelectedLab(null);
+    setSelectedInstance(null);
+  };
 
   return (
     <div className="p-8 space-y-8">
@@ -78,7 +121,13 @@ export default function LiveMetrics() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold text-foreground mb-2">Live Metrics</h1>
-          <p className="text-muted-foreground">Real-time system performance monitoring</p>
+          <p className="text-muted-foreground">
+            {showAllMetrics
+              ? 'Real-time system performance monitoring across all instances'
+              : selectedInstance
+                ? `Real-time metrics for ${selectedInstance}`
+                : 'Select a lab to view metrics'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 text-sm">
@@ -94,6 +143,53 @@ export default function LiveMetrics() {
             {isLive ? 'Pause' : 'Resume'}
           </button>
         </div>
+      </div>
+
+      {/* Lab Selection */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground mb-3">Select Lab</h3>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={showAllMetrics ? 'default' : 'outline'}
+              onClick={handleViewAll}
+              className={showAllMetrics ? 'bg-primary text-primary-foreground' : 'border-border'}
+            >
+              View All
+            </Button>
+            {mockLabs.map((lab) => (
+              <Button
+                key={lab.id}
+                variant={selectedLab === lab.id ? 'default' : 'outline'}
+                onClick={() => handleLabSelect(lab.id)}
+                className={selectedLab === lab.id ? 'bg-primary text-primary-foreground' : 'border-border'}
+              >
+                {lab.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Instance Selection - Only show if lab is selected */}
+        {selectedLab && availableInstances.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Select Instance</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {availableInstances.map((instance) => (
+                <Button
+                  key={instance.id}
+                  variant={selectedInstance === instance.id ? 'default' : 'outline'}
+                  onClick={() => handleInstanceSelect(instance.id)}
+                  className={`justify-start gap-2 ${selectedInstance === instance.id ? 'bg-primary text-primary-foreground' : 'border-border'}`}
+                >
+                  <Server className="w-4 h-4" />
+                  {instance.name}
+                  {selectedInstance === instance.id && <ChevronRight className="w-4 h-4 ml-auto" />}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Current Status Cards */}
