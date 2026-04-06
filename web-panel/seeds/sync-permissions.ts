@@ -39,6 +39,16 @@ const PERMISSION_STRUCTURE = [
     ],
   },
   {
+    moduleName: "Lab Management",
+    moduleSlug: "lab",
+    permissions: [
+      { name: "View Labs", guard: "lab.view" },
+      { name: "Create Labs", guard: "lab.create" },
+      { name: "Update Labs", guard: "lab.update" },
+      { name: "Delete Labs", guard: "lab.delete" },
+    ],
+  },
+  {
     moduleName: "Live Metrics",
     moduleSlug: "metrics",
     permissions: [{ name: "View Real-time Metrics", guard: "metrics.view" }],

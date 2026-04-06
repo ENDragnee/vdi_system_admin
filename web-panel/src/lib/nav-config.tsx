@@ -6,6 +6,7 @@ import {
   Activity,
   HardDrive,
   BookOpen,
+  Library,
   Settings,
 } from "lucide-react";
 import { ReactNode } from "react";
@@ -36,6 +37,12 @@ export const adminNavConfig: NavItem[] = [
     href: "/admin/instances",
     icon: <Server className="w-5 h-5" />,
     requiredPermission: "vm.view",
+  },
+  {
+    name: "Lab Management",
+    href: "/admin/labs",
+    icon: <Library className="w-5 h-5" />,
+    requiredPermission: "lab.view",
   },
   {
     name: "Package Management",
