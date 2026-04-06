@@ -1,10 +1,10 @@
-// lib/auth.ts
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 import { validate_password } from "./password-utils";
 import { getUserAgent } from "./user-agent";
 import { randomBytes } from "crypto";
+import { getServerSession } from "next-auth";
 
 const SESSION_MAX_AGE = 24 * 60 * 60; // 24 hours
 
@@ -13,7 +13,7 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "text", placeholder: "test@mail.com" },
+        email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
@@ -21,51 +21,22 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Missing credentials");
         }
 
-        const {} = await prisma.$transaction([
-          prisma.user.findUnique({
-            where: { email: credentials.email },
-            select: {
-              id: true,
-              roleUsers: {
-                select: {
-                  roles: {
-                    select: {
-                      guardName: true,
-                    },
-                  },
-                },
-              },
-              email: true,
-              password: true,
-              name: true,
-            },
-          }),
-        ]);
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
-          select: {
-            id: true,
+          include: {
             roleUsers: {
-              select: {
+              include: {
                 roles: {
-                  select: {
-                    guardName: true,
+                  include: {
                     permissionRoles: {
-                      select: {
-                        permissions: {
-                          select: {
-                            guardName: true,
-                          },
-                        },
+                      include: {
+                        permissions: true,
                       },
                     },
                   },
                 },
               },
             },
-            email: true,
-            password: true,
-            name: true,
           },
         });
 
@@ -77,23 +48,21 @@ export const authOptions: NextAuthOptions = {
           credentials.password,
           user.password,
         );
-
         if (!isValid) {
           throw new Error("Invalid University ID or Password!");
         }
 
-        const userRoles = user.roleUsers.map((role) => role.roles.guardName);
-        const rolePermissions = user.roleUsers.flatMap((roleUser) =>
-          roleUser.roles.permissionRoles.map((pr) => pr.permissions.guardName),
+        const userRoles = user.roleUsers.map((ru) => ru.roles.guardName);
+        const rolePermissions = user.roleUsers.flatMap((ru) =>
+          ru.roles.permissionRoles.map((pr) => pr.permissions.guardName),
         );
 
-        const uniquePermissions = Array.from(new Set(rolePermissions));
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           role: userRoles,
-          permissions: uniquePermissions,
+          permissions: Array.from(new Set(rolePermissions)),
         };
       },
     }),
@@ -111,8 +80,8 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    // 1. Creates/Updates the JWT (Edge Compatible)
     async jwt({ token, user }) {
+      // If `user` object exists, it's the first time this token is being created
       if (user) {
         const { userAgent, ip } = await getUserAgent();
         const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
@@ -128,16 +97,16 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
+        // Persist the custom properties from the `authorize` user object to the JWT
         token.id = user.id;
-        token.email = user.email;
         token.role = user.role;
         token.permissions = user.permissions;
-        token.name = user.name;
         token.token = sessionToken;
         token.invalid = false;
         token.exp = Math.floor(expiresAt.getTime() / 1000);
       }
 
+      // On subsequent requests, check if the session is still valid in the DB
       if (!token.token) {
         token.invalid = true;
         return token;
@@ -150,38 +119,34 @@ export const authOptions: NextAuthOptions = {
 
       if (!session || session.expiresAt < new Date()) {
         token.invalid = true;
-        return token;
       }
       return token;
     },
 
-    // 2. Exposes JWT data to the Client/Server Components
     async session({ session, token }) {
       if (token.invalid) {
         session.user = undefined;
         session.expires = new Date(0).toISOString();
         return session;
       }
-      if (session.user && token) {
+
+      // Pass the custom properties from the JWT to the client-side session object
+      if (session.user && token.id) {
         session.user.id = token.id;
-        session.user.email = token.email;
-        session.user.role = token.role as any;
-        session.user.permissions = token.permissions as string[];
-        session.user.name = token.name as string;
-        session.expires = new Date(token.exp * 1000).toISOString();
+        session.user.role = token.role;
+        session.user.permissions = token.permissions;
       }
       return session;
     },
   },
 
-  // Log logins in the background (Doesn't block edge runtime)
   events: {
     async signIn({ user }) {
       await prisma.log.create({
         data: {
           type: "AUTH_LOGIN_SUCCESS",
           severity: "INFO",
-          message: `User ${user.email} logged in.`,
+          message: `User ${user.email} successfully logged in.`,
           userId: user.id,
         },
       });
@@ -193,3 +158,22 @@ export const authOptions: NextAuthOptions = {
 };
 
 export default NextAuth(authOptions);
+
+export const getActionSession = async () => {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error("Not authenticated");
+  }
+  return session.user;
+};
+
+export const checkPermission = async (
+  permissionName: string,
+): Promise<boolean> => {
+  try {
+    const user = await getActionSession();
+    return user.permissions.includes(permissionName);
+  } catch (error) {
+    return false;
+  }
+};

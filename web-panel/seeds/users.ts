@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { hash_password } from "./lib/password-utils";
-import { prisma } from "./lib/prisma";
+import { hash_password } from "../src/lib/password-utils";
+import { prisma } from "../src/lib/prisma";
 
 async function main() {
   console.log(`Start seeding users and roles... 🌱`);
@@ -62,7 +62,7 @@ async function main() {
       update: {
         name: u.name,
         // Optional: password: hashedPassword,
-        
+
         // SYNC ROLES: This clears out old roles and applies the exact roles from the array above
         roleUsers: {
           deleteMany: {}, // Deletes existing connections in the join table
@@ -73,7 +73,7 @@ async function main() {
         email: u.email,
         name: u.name,
         password: hashedPassword,
-        
+
         // CREATE ROLES: Simply connect the roles upon user creation
         roleUsers: {
           create: roleConnections,
