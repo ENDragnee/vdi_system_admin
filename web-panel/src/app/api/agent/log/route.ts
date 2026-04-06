@@ -1,3 +1,4 @@
+// app/api/agent/log/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -8,44 +9,61 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { type, severity, message, targetName, details } = await req.json();
+    const body = await req.json();
+    // Use targetId as sent by the agent
+    const { type, severity, message, targetName, targetId, details } = body;
 
-    const vm = await prisma.vM.findFirst({ where: { hostname: targetName } });
+    console.log(
+      `📥 Webhook: ID ${targetId} | Host: ${targetName} | Type: ${type}`,
+    );
 
-    // 1. Create the log entry
+    // --- THE FIX: PREVENT PRISMA CRASH ---
+    let vm = null;
+    if (targetId) {
+      vm = await prisma.vM.findUnique({
+        where: { id: targetId },
+      });
+    }
+
+    // Fallback: If ID is missing, try matching by hostname
+    if (!vm && targetName) {
+      vm = await prisma.vM.findFirst({
+        where: { hostname: { equals: targetName, mode: "insensitive" } },
+      });
+    }
+
+    // 2. Create the log entry (Always works even if vm is null)
     const newLog = await prisma.log.create({
       data: {
         type: type,
         severity: severity,
         message: message,
-        targetName: targetName,
-        targetId: vm?.id || null,
-        details: details ? JSON.stringify({ output: details }) : {},
+        targetName: targetName || "unknown",
+        targetId: vm?.id || targetId || null,
+        details: details ? { output: details } : {},
       },
     });
 
-    // 2. If build was successful, mark pending packages as installed
-    if (type === "NIX_BUILD_SUCCESS" && vm) {
-      await prisma.vMPackage.updateMany({
-        where: { vmId: vm.id, status: "PENDING" },
-        data: { status: "INSTALLED" },
-      });
+    // 3. Update Package Statuses
+    if (vm) {
+      const statusUpdate =
+        type === "NIX_BUILD_SUCCESS"
+          ? "INSTALLED"
+          : type === "NIX_BUILD_FAILED"
+            ? "FAILED"
+            : null;
+
+      if (statusUpdate) {
+        await prisma.vMPackage.updateMany({
+          where: { vmId: vm.id, status: "PENDING" },
+          data: { status: statusUpdate },
+        });
+      }
     }
 
-    // 3. If build failed, mark pending packages as failed
-    if (type === "NIX_BUILD_FAILED" && vm) {
-      await prisma.vMPackage.updateMany({
-        where: { vmId: vm.id, status: "PENDING" },
-        data: { status: "FAILED" },
-      });
-    }
-
-    return NextResponse.json(
-      { success: true, logId: newLog.id },
-      { status: 201 },
-    );
-  } catch (error) {
-    console.error("Webhook error:", error);
+    return NextResponse.json({ success: true }, { status: 201 });
+  } catch (error: any) {
+    console.error("🔴 Webhook Error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

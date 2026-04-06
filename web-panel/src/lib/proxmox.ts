@@ -14,9 +14,15 @@ export async function pveFetch(endpoint: string, method = "GET", data?: any) {
     throw new Error("Missing Proxmox configuration in environment variables.");
   }
 
-  // FIX: If it's a POST/PUT request and there is no data, send an empty JSON object
-  // so the Proxmox Perl backend doesn't crash trying to parse an empty string.
-  const payload = method !== "GET" && data === undefined ? {} : data;
+  // --- THE FIX ---
+  // 1. POST and PUT require a body. If none is provided, send {} to avoid char 0 errors.
+  // 2. DELETE and GET must not have any body content.
+  let payload = data;
+  if (method === "POST" || method === "PUT") {
+    payload = data === undefined ? {} : data;
+  } else if (method === "DELETE" || method === "GET") {
+    payload = undefined;
+  }
 
   try {
     const response = await axios({
@@ -26,7 +32,7 @@ export async function pveFetch(endpoint: string, method = "GET", data?: any) {
         Authorization: `PVEAPIToken=${TOKEN}`,
         "Content-Type": "application/json",
       },
-      data: payload,
+      data: payload, // Axios will correctly omit body if this is undefined
       httpsAgent,
     });
 

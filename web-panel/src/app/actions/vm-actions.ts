@@ -78,32 +78,43 @@ export async function DeleteVmAction(vmId: string, proxmoxId: number) {
   const user = await getActionSession();
 
   try {
-    // 1. Stop the VM
-    await pveFetch(
-      `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}/status/stop`,
-      "POST",
-    ).catch(() => {});
+    // 1. Attempt to stop the VM.
+    // We wrap this in a specific try/catch so if the VM is ALREADY stopped,
+    // it doesn't crash the whole delete action.
+    try {
+      await pveFetch(
+        `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}/status/stop`,
+        "POST",
+      );
+      // Wait for shutdown to complete
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    } catch (e) {
+      console.log(
+        `Stop command skipped for ${proxmoxId} (likely already stopped)`,
+      );
+    }
 
-    // Wait 3 seconds to ensure it powers off gracefully
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // 2. Delete the VM
+    // 2. Delete the VM (Now with no body content)
     const deleteResponse = await pveFetch(
       `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}`,
       "DELETE",
     );
 
-    // Wait for the disk wiping task to finish
-    await waitForTask(PROXMOX_NODE, deleteResponse.data);
+    // 3. Wait for the background deletion task to finish
+    // Proxmox returns the Task UPID in the .data field of the response
+    if (deleteResponse.data) {
+      await waitForTask(PROXMOX_NODE, deleteResponse.data);
+    }
 
-    // 3. Remove from DB
+    // 4. Remove from Postgres
     const vm = await prisma.vM.delete({ where: { id: vmId } });
 
+    // 5. Log the destruction
     await prisma.log.create({
       data: {
         type: "VM_DESTROYED",
         severity: "WARNING",
-        message: `Destroyed VM '${vm.hostname}'.`,
+        message: `User '${user.email}' destroyed VM '${vm.hostname}' (PVE ID: ${proxmoxId}).`,
         targetId: vmId,
         targetName: vm.hostname,
         userId: user.id,
@@ -113,6 +124,7 @@ export async function DeleteVmAction(vmId: string, proxmoxId: number) {
 
     return { success: true };
   } catch (error: any) {
+    console.error("DeleteVmAction Error:", error.message);
     throw new Error(error.message);
   }
 }
