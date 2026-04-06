@@ -3,7 +3,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  console.log(`Start seeding permissions for Sidebar... 🌱`);
+  console.log(`Start seeding permissions... 🌱`);
 
   const adminRole = await prisma.role.findFirst({
     where: { guardName: "ADMIN" },
@@ -13,36 +13,83 @@ async function main() {
     process.exit(1);
   }
 
-  const vmModule = await prisma.module.upsert({
-    where: { id: "mod-vm" },
+  // 1. Create/Update Modules
+  const coreModule = await prisma.module.upsert({
+    where: { id: "mod-core" },
     update: { isActive: true },
-    create: { id: "mod-vm", name: "Core System", slug: "core", isActive: true },
+    create: {
+      id: "mod-core",
+      name: "Core System",
+      slug: "core",
+      isActive: true,
+    },
   });
 
-  // EXACT MATCHES for your nav-config.tsx
+  const pkgModule = await prisma.module.upsert({
+    where: { id: "mod-packages" },
+    update: { isActive: true },
+    create: {
+      id: "mod-packages",
+      name: "Package Management",
+      slug: "packages",
+      isActive: true,
+    },
+  });
+
+  // 2. Define Granular Permissions
   const permissions = [
-    { name: "View Dashboard", guardName: "dashboard.view" },
-    { name: "Manage Faculty", guardName: "faculty.manage" },
-    { name: "View VMs", guardName: "vm.view" },
-    { name: "Manage Packages", guardName: "packages.manage" },
-    { name: "View Metrics", guardName: "metrics.view" },
-    { name: "View Logs", guardName: "logs.view" },
-    { name: "Manage Settings", guardName: "settings.manage" },
-    { name: "Faculty Dashboard", guardName: "faculty.dashboard.view" },
+    // Sidebar & Dashboard
+    {
+      name: "View Dashboard",
+      guardName: "dashboard.view",
+      modId: coreModule.id,
+    },
+    {
+      name: "Manage Faculty",
+      guardName: "faculty.manage",
+      modId: coreModule.id,
+    },
+    { name: "View VMs", guardName: "vm.view", modId: coreModule.id },
+    { name: "View Metrics", guardName: "metrics.view", modId: coreModule.id },
+    { name: "View Logs", guardName: "logs.view", modId: coreModule.id },
+
+    // Package Management (API & UI)
+    {
+      name: "Manage Packages",
+      guardName: "packages.manage",
+      modId: pkgModule.id,
+    },
+    { name: "View Packages", guardName: "packages.view", modId: pkgModule.id },
+    {
+      name: "Create Packages",
+      guardName: "packages.create",
+      modId: pkgModule.id,
+    },
+    {
+      name: "Update Packages",
+      guardName: "packages.update",
+      modId: pkgModule.id,
+    },
+    {
+      name: "Delete Packages",
+      guardName: "packages.delete",
+      modId: pkgModule.id,
+    },
   ];
 
   for (const p of permissions) {
     const perm = await prisma.permission.upsert({
       where: { id: `perm-${p.guardName}` },
-      update: { name: p.name },
+      update: { name: p.name, moduleId: p.modId },
       create: {
         id: `perm-${p.guardName}`,
         name: p.name,
         guardName: p.guardName,
-        moduleId: vmModule.id,
+        moduleId: p.modId,
       },
     });
 
+    // 3. Assign all to ADMIN role
     await prisma.permissionRole.upsert({
       where: { id: `pr-${adminRole.id}-${perm.id}` },
       update: {},
