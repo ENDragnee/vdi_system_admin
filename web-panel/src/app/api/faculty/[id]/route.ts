@@ -42,12 +42,12 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { name, email, labId } = body;
 
@@ -90,8 +90,8 @@ export async function PUT(
     const updatedFaculty = await prisma.user.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(email && { email }),
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
         ...(labId !== undefined && { labId: labId || null }),
       },
       include: {

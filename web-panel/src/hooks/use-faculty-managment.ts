@@ -16,7 +16,8 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export function useFaculty(initialData: Faculty[]) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAddingFaculty, setIsAddingFaculty] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEdit, setIsEdit] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -35,6 +36,14 @@ export function useFaculty(initialData: Faculty[]) {
       f.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [faculty, searchTerm]);
+  
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+    });
+  };
 
   const addFaculty = async () => {
     await fetch('/api/faculty', {
@@ -44,7 +53,6 @@ export function useFaculty(initialData: Faculty[]) {
     });
 
     setFormData({ name: '', email: '', password: '' });
-    setIsAddingFaculty(false);
     mutate();
   };
 
@@ -55,12 +63,37 @@ export function useFaculty(initialData: Faculty[]) {
     mutate();
   };
 
+  const startEditing = (member: Faculty) => {
+    setEditingId(member.id);
+    setFormData({
+      name: member.name || '',
+      email: member.email,
+      password: '',
+    });
+  };
+
+  const editFaculty = async (id: string) => {
+    await fetch(`/api/faculty/${id}`, { 
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    setFormData({ name: '', email: '', password: '' });
+    setEditingId(null);
+    mutate();
+  }
+  const cancelEdit = () => {
+    setEditingId(null);
+    resetForm();
+  };
   return {
     // state
     searchTerm,
     setSearchTerm,
-    isAddingFaculty,
-    setIsAddingFaculty,
+    isEdit,
+    setIsEdit,
+    editingId,
+    setEditingId,
     formData,
     setFormData,
 
@@ -72,5 +105,8 @@ export function useFaculty(initialData: Faculty[]) {
     // actions
     addFaculty,
     deleteFaculty,
+    editFaculty,
+    startEditing,
+    cancelEdit,
   };
 }
