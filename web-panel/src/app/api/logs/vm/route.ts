@@ -8,20 +8,29 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const hostname = searchParams.get("hostname") || ""; // This is the 'host' tag
+  const hostname = searchParams.get("hostname") || "";
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "20");
+  const sortBy = searchParams.get("sortBy") || "_time";
+  const sortOrder = searchParams.get("sortOrder") === "asc" ? "false" : "true";
+  const startDate = searchParams.get("startDate") || "-24h";
+  const endDate = searchParams.get("endDate") || "now()";
+
   const skip = (page - 1) * limit;
 
-  // Flux Query optimized for your schema
+  // Optimized Flux Query for standard Telegraf data
   const fluxQuery = `
     from(bucket: "${bucket}")
-      |> range(start: -24h)
-      |> filter(fn: (r) => r["_measurement"] == "proxmox")
+      |> range(start: ${startDate}, stop: ${endDate})
+      |> filter(fn: (r) => 
+        (r["_measurement"] == "cpu" and r["cpu"] == "cpu-total") or 
+        (r["_measurement"] == "mem") or 
+        (r["_measurement"] == "net") or
+        (r["_measurement"] == "system")
+      )
       ${hostname ? `|> filter(fn: (r) => r["host"] == "${hostname}")` : ""}
-      |> drop(columns: ["status"]) 
-      |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-      |> sort(columns: ["_time"], desc: true)
+      |> pivot(rowKey:["_time", "host"], columnKey: ["_field"], valueColumn: "_value")
+      |> sort(columns: ["${sortBy}"], desc: ${sortOrder})
       |> limit(n: ${limit}, offset: ${skip})
   `;
 
@@ -30,21 +39,24 @@ export async function GET(req: NextRequest) {
     return new Promise((resolve) => {
       queryApi.queryRows(fluxQuery, {
         next(row, tableMeta) {
-          data.push(tableMeta.toObject(row));
+          const obj = tableMeta.toObject(row);
+          data.push({
+            ...obj,
+            cpuload: obj.usage_active ? obj.usage_active / 100 : 0,
+            mem_used_percentage: obj.used_percent || 0,
+            disk_used_percentage: obj.used_percent || 0,
+            status: "running",
+          });
         },
         error(err) {
-          console.error("Influx Query Error:", err.message);
+          console.error("Influx Error:", err);
           resolve(NextResponse.json({ error: err.message }, { status: 500 }));
         },
         complete() {
           resolve(
             NextResponse.json({
               data,
-              meta: {
-                page,
-                limit,
-                hasMore: data.length === limit,
-              },
+              meta: { page, limit, hasMore: data.length === limit },
             }),
           );
         },
