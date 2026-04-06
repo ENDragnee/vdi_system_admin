@@ -49,6 +49,14 @@ const PERMISSION_STRUCTURE = [
     ],
   },
   {
+    moduleName: "Logging & Audit",
+    moduleSlug: "logs",
+    permissions: [
+      { name: "View System Logs", guard: "logs.view" },
+      { name: "Export Logs", guard: "logs.export" },
+    ],
+  },
+  {
     moduleName: "Live Metrics",
     moduleSlug: "metrics",
     permissions: [{ name: "View Real-time Metrics", guard: "metrics.view" }],
