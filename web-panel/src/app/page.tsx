@@ -1,11 +1,13 @@
-'use client';
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Server, Shield, BarChart3, Zap, CheckCircle, Activity, ArrowRight } from 'lucide-react';
 import { ThemeSwitcher } from '@/components/theme-switcher';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
+// Move static data outside the component to prevent re-creation on every render
 const features = [
   {
     icon: BarChart3,
@@ -51,7 +53,19 @@ const features = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  // 1. Check for an active session securely on the server
+  const session = await getServerSession(authOptions);
+
+  // 2. If logged in, automatically route to the correct dashboard
+  if (session?.user) {
+    const roles = session.user.role || [];
+    if (roles.includes("ADMIN")) redirect("/admin/dashboard");
+    if (roles.includes("FACULTY")) redirect("/faculty/dashboard");
+    redirect("/dashboard"); // Fallback for standard users
+  }
+
+  // 3. If NOT logged in, render the landing page for guests
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-primary/5">
       {/* Navigation */}
@@ -84,7 +98,6 @@ export default function Home() {
       <main>
         {/* Hero Section */}
         <section className="relative py-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-          {/* Animated background elements */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 dark:bg-primary/5 rounded-full blur-3xl animate-pulse duration-8"></div>
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 dark:bg-accent/5 rounded-full blur-3xl animate-pulse duration-8 delay-4"></div>
@@ -110,7 +123,7 @@ export default function Home() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fadeIn animation-delay-300">
-              <Link href="/admin">
+              <Link href="/auth">
                 <Button size="lg" className="bg-gradient-to-r from-primary to-accent hover:shadow-xl hover:shadow-primary/40 text-lg px-8 transition-all duration-300 group">
                   Start Monitoring
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -144,10 +157,7 @@ export default function Home() {
                   <div
                     key={index}
                     className="group relative overflow-hidden"
-                    style={{
-                      animation: `fadeInUp 0.6s ease-out ${index * 100}ms forwards`,
-                      opacity: 0,
-                    }}
+                    style={{ animation: `fadeInUp 0.6s ease-out ${index * 100}ms forwards`, opacity: 0 }}
                   >
                     <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
 
@@ -180,7 +190,7 @@ export default function Home() {
             <p className="text-xl text-foreground/70 mb-8 max-w-2xl mx-auto">
               Join administrators worldwide who are monitoring and managing their virtual desktop infrastructure with confidence using VDS Admin.
             </p>
-            <Link href="/admin">
+            <Link href="/auth">
               <Button size="lg" className="bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/40 text-lg px-10 transition-all duration-300 group">
                 Get Started Now
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -190,51 +200,22 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-border/40 bg-muted/20 dark:bg-primary/5 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-foreground/60">
-            <p>&copy; 2025 VDS Admin. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} VDS Admin. All rights reserved.</p>
           </div>
         </div>
       </footer>
 
+      {/* Internal Styles mapping mapped to tailwind classes logically. */}
       <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.8s ease-out;
-        }
-
-        .animation-delay-100 {
-          animation-delay: 0.1s;
-        }
-
-        .animation-delay-200 {
-          animation-delay: 0.2s;
-        }
-
-        .animation-delay-300 {
-          animation-delay: 0.3s;
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
+        .animation-delay-100 { animation-delay: 0.1s; }
+        .animation-delay-200 { animation-delay: 0.2s; }
+        .animation-delay-300 { animation-delay: 0.3s; }
       `}</style>
     </div>
   );

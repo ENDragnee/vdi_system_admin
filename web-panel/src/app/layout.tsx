@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/provider/theme-provider";
+import SessionProviderWrapper from "@/provider/session-provider";
+import { QueryProvider } from "@/provider/query-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,11 +31,15 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <div className="h-screen bg-background">
-            {children}
-          </div>
-        </ThemeProvider>
+        <SessionProviderWrapper>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+            <QueryProvider>
+              <div className="h-screen bg-background">
+                {children}
+              </div>
+            </QueryProvider>
+          </ThemeProvider>
+        </SessionProviderWrapper>
       </body>
     </html>
   );
