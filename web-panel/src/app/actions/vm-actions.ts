@@ -7,6 +7,8 @@ import { checkPermission, getActionSession } from "@/lib/auth";
 
 const TEMPLATE_ID = 100;
 const PROXMOX_NODE = process.env.PROXMOX_NODE || "pve";
+const PROXMOX_HOST =
+  process.env.PROXMOX_URL?.split(":8006")[0].replace("https://", "") || "";
 
 export async function CreateVmAction(
   proxmoxId: number,
@@ -190,6 +192,65 @@ export async function MassVmAction(
 
     await Promise.all(promises);
     return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function GetVmConsoleAction(
+  proxmoxId: number,
+  type: "novnc" | "xtermjs" | "spice",
+) {
+  const hasPermission = await checkPermission("vm.view");
+  if (!hasPermission) throw new Error("Unauthorized");
+
+  const PROXMOX_NODE = process.env.PROXMOX_NODE || "pve";
+
+  try {
+    const isSpice = type === "spice";
+    const endpoint = `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}/${isSpice ? "spiceproxy" : "vncproxy"}`;
+
+    const res = await pveFetch(endpoint, "POST");
+
+    // 🔥 FIX: Normalize Proxmox response
+    const d = res?.data || res;
+
+    if (isSpice) {
+      // 🔥 Validate required fields
+      if (!d || !d.password || !d["tls-port"] || !d.host) {
+        throw new Error("Invalid SPICE response from Proxmox");
+      }
+
+      return {
+        success: true,
+        type: "file",
+        data: d,
+        filename: `console-${proxmoxId}.vv`,
+      };
+    }
+
+    const baseUrl = process.env.PROXMOX_URL?.split("/api2")[0];
+    const isXterm = type === "xtermjs";
+
+    const params = new URLSearchParams({
+      console: "kvm",
+      vmid: String(proxmoxId),
+      vmname: `vm${proxmoxId}`,
+      node: PROXMOX_NODE,
+    });
+
+    if (isXterm) {
+      params.append("xtermjs", "1");
+      params.append("cmd", "");
+    } else {
+      params.append("novnc", "1");
+    }
+
+    return {
+      success: true,
+      type: "url",
+      url: `${baseUrl}/?${params.toString()}`,
+    };
   } catch (error: any) {
     throw new Error(error.message);
   }

@@ -14,13 +14,11 @@ export async function pveFetch(endpoint: string, method = "GET", data?: any) {
     throw new Error("Missing Proxmox configuration in environment variables.");
   }
 
-  // --- THE FIX ---
-  // 1. POST and PUT require a body. If none is provided, send {} to avoid char 0 errors.
-  // 2. DELETE and GET must not have any body content.
   let payload = data;
+
   if (method === "POST" || method === "PUT") {
     payload = data === undefined ? {} : data;
-  } else if (method === "DELETE" || method === "GET") {
+  } else {
     payload = undefined;
   }
 
@@ -32,19 +30,22 @@ export async function pveFetch(endpoint: string, method = "GET", data?: any) {
         Authorization: `PVEAPIToken=${TOKEN}`,
         "Content-Type": "application/json",
       },
-      data: payload, // Axios will correctly omit body if this is undefined
+      data: payload,
       httpsAgent,
     });
 
+    // 🔥 ALWAYS return normalized structure
     return response.data;
   } catch (error: any) {
     let errorMsg = error.message;
+
     if (error.response?.data) {
       errorMsg =
         typeof error.response.data === "string"
           ? error.response.data
           : JSON.stringify(error.response.data);
     }
+
     throw new Error(errorMsg);
   }
 }
