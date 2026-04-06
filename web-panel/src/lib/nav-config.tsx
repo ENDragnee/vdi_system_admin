@@ -8,6 +8,7 @@ import {
   BookOpen,
   Library,
   Settings,
+  Laptop
 } from "lucide-react";
 import { ReactNode } from "react";
 
@@ -27,10 +28,10 @@ export const adminNavConfig: NavItem[] = [
     requiredPermission: "dashboard.view",
   },
   {
-    name: "Faculty Management",
-    href: "/admin/faculty-management",
-    icon: <Users className="w-5 h-5" />,
-    requiredPermission: "faculty.manage",
+    name: "Live Metrics",
+    href: "/admin/metrics",
+    icon: <Activity className="w-5 h-5" />,
+    requiredPermission: "metrics.view",
   },
   {
     name: "Instance Management",
@@ -39,45 +40,51 @@ export const adminNavConfig: NavItem[] = [
     requiredPermission: "vm.view",
   },
   {
-    name: "Lab Management",
-    href: "/admin/labs",
-    icon: <Library className="w-5 h-5" />,
-    requiredPermission: "lab.view",
-  },
-  {
     name: "Package Management",
     href: "/admin/packages",
     icon: <HardDrive className="w-5 h-5" />,
     requiredPermission: "packages.manage",
   },
   {
-    name: "Live Metrics",
-    href: "/admin/metrics",
-    icon: <Activity className="w-5 h-5" />,
-    requiredPermission: "metrics.view",
+    name: "Lab Management",
+    href: "/admin/labs",
+    icon: <Library className="w-5 h-5" />,
+    requiredPermission: "lab.view",
+  },
+  {
+    name: "Faculty Management",
+    href: "/admin/faculty-management",
+    icon: <Users className="w-5 h-5" />,
+    requiredPermission: "faculty.manage",
   },
   {
     name: "System Logs",
-    href: "/admin/logs",
+    href: "/admin/logs/system",
     icon: <Activity className="w-5 h-5" />,
+    requiredPermission: "logs.view",
+  },
+  {
+    name: "VM Logs",
+    href: "/admin/logs/vm",
+    icon: <Laptop className="w-5 h-5" />,
     requiredPermission: "logs.view",
   },
 ];
 
-export const facultyNavConfig: NavItem[] = [
-  {
-    name: "Faculty Panel",
-    href: "/faculty/dashboard",
-    icon: <BookOpen className="w-5 h-5" />,
-    requiredPermission: "faculty.dashboard.view",
-  },
-];
-
-export const settingsNavConfig: NavItem[] = [
-  {
-    name: "Settings",
-    href: "/admin/settings",
-    icon: <Settings className="w-5 h-5" />,
-    requiredPermission: "settings.manage",
-  },
-];
+// export const facultyNavConfig: NavItem[] = [
+//   {
+//     name: "Faculty Panel",
+//     href: "/faculty/dashboard",
+//     icon: <BookOpen className="w-5 h-5" />,
+//     requiredPermission: "faculty.dashboard.view",
+//   },
+// ];
+//
+// export const settingsNavConfig: NavItem[] = [
+//   {
+//     name: "Settings",
+//     href: "/admin/settings",
+//     icon: <Settings className="w-5 h-5" />,
+//     requiredPermission: "settings.manage",
+//   },
+// ];

@@ -3,7 +3,7 @@ import { Server } from 'lucide-react';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { SidebarProfile } from './sidebar-profile';
 import { SidebarNav } from './sidebar-nav';
-import { adminNavConfig, facultyNavConfig, settingsNavConfig } from '@/lib/nav-config';
+import { adminNavConfig } from '@/lib/nav-config';
 
 export function Sidebar() {
   return (
@@ -24,13 +24,11 @@ export function Sidebar() {
       {/* Navigation Sections */}
       <div className="flex-1 overflow-y-auto">
         <SidebarNav title="Administration" items={adminNavConfig} />
-        <SidebarNav title="Faculty Access" items={facultyNavConfig} />
       </div>
 
       {/* Footer / Profile Section */}
       <div className="mt-auto">
         <div className="px-4 py-2 border-t border-border">
-          <SidebarNav title="Configuration" items={settingsNavConfig} />
           <div className="flex items-center justify-between px-2 py-2">
             <span className="text-xs font-semibold text-muted-foreground">Theme</span>
             <ThemeSwitcher />
