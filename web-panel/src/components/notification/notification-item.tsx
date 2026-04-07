@@ -2,10 +2,15 @@
 
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
-import { AlertCircle, CheckCircle2, Info, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, Zap, Check } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
-export function NotificationItem({ notif, onClick }: { notif: any, onClick?: () => void }) {
+export function NotificationItem({ notif, onMarkRead, onClick }: {
+  notif: any,
+  onMarkRead?: (id: string) => void,
+  onClick?: () => void
+}) {
   const icons = {
     SUCCESS: <CheckCircle2 className="w-4 h-4 text-green-500" />,
     ERROR: <AlertCircle className="w-4 h-4 text-red-500" />,
@@ -14,27 +19,49 @@ export function NotificationItem({ notif, onClick }: { notif: any, onClick?: () 
     INFO: <Info className="w-4 h-4 text-blue-500" />,
   };
 
+  const handleMarkRead = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onMarkRead) onMarkRead(notif.id);
+  };
+
   const Content = (
     <div className={cn(
-      "flex items-start gap-3 p-4 transition-colors hover:bg-muted/50 border-b border-border/50",
-      !notif.isRead && "bg-primary/[0.03]"
+      "group flex items-start gap-4 p-4 transition-all duration-300 relative border-l-4",
+      // Unread: Strong colors and stripe
+      !notif.isRead ? "bg-primary/[0.02] border-l-primary" : "opacity-50 grayscale-[0.5] border-l-transparent",
+      "hover:bg-muted/50"
     )}>
-      <div className="mt-1">{icons[notif.type as keyof typeof icons]}</div>
-      <div className="flex-1 space-y-1">
-        <p className={cn("text-sm leading-none", !notif.isRead ? "font-bold" : "font-medium")}>
-          {notif.title}
-        </p>
-        <p className="text-xs text-muted-foreground line-clamp-2">{notif.message}</p>
-        <p className="text-[10px] uppercase font-black opacity-40">
-          {formatDistanceToNow(new Date(notif.createdAt))} ago
-        </p>
+      <div className="mt-1 shrink-0">{icons[notif.type as keyof typeof icons]}</div>
+      <div className="flex-1 space-y-1 min-w-0">
+        <div className="flex justify-between items-center gap-2">
+          <p className={cn("text-sm leading-none truncate", !notif.isRead ? "font-bold text-foreground" : "font-medium text-muted-foreground")}>
+            {notif.title}
+          </p>
+          <span className="text-[9px] uppercase font-black opacity-30 whitespace-nowrap">
+            {formatDistanceToNow(new Date(notif.createdAt))} ago
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{notif.message}</p>
       </div>
+
+      {/* Hover Action: Mark Read */}
+      {!notif.isRead && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleMarkRead}
+          className="h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-background shadow-sm hover:text-green-600 hover:bg-green-50"
+        >
+          <Check className="w-3.5 h-3.5" />
+        </Button>
+      )}
     </div>
   );
 
   if (notif.link) {
-    return <Link href={notif.link} onClick={onClick}>{Content}</Link>;
+    return <Link href={notif.link} onClick={onClick} className="block no-underline">{Content}</Link>;
   }
 
-  return <div onClick={onClick}>{Content}</div>;
+  return <div onClick={onClick} className="cursor-pointer">{Content}</div>;
 }

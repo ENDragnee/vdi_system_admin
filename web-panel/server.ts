@@ -121,7 +121,7 @@ async function startServer() {
     log.debug({ socketId: socket.id }, "Client connected");
   });
 
-  httpServer.listen(PORT_NUMBER, () => {
+  httpServer.listen(PORT_NUMBER, "0.0.0.0", () => {
     log.info(`\n🚀 VDI CONTROL PLANE ONLINE`);
     log.info(`> Dashboard: http://localhost:${PORT_NUMBER}`);
     log.info(`> Alerts: CPU/RAM > 90%\n`);

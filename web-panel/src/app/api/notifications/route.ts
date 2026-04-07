@@ -67,37 +67,46 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT() {
-  const startTime = Date.now();
-
   try {
     const user = await getActionSession();
-    log.info({ user: user.email }, "Marking all notifications as read");
 
-    // 3. Batch Update
+    const where: any = user.role.includes("ADMIN")
+      ? { isRead: false }
+      : { isRead: false, OR: [{ userId: user.id }, { labId: user.labId }] };
+
     const result = await prisma.notification.updateMany({
-      where: {
-        userId: user.id,
-        isRead: false,
-      },
+      where,
       data: { isRead: true },
     });
 
-    const duration = Date.now() - startTime;
     log.info(
-      { duration, updateCount: result.count },
-      "User notifications updated to read status",
+      { user: user.email, count: result.count },
+      "Bulk mark-as-read complete",
     );
-
     return NextResponse.json({ success: true, count: result.count });
   } catch (error: any) {
-    log.error(
-      {
-        err: error.message,
-        context: "PUT /api/notifications",
-      },
-      "Failed to mark notifications as read",
-    );
+    log.error({ err: error.message }, "Mark all read failed");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
 
+export async function DELETE() {
+  try {
+    const user = await getActionSession();
+
+    const where: any = user.role.includes("ADMIN")
+      ? {}
+      : { OR: [{ userId: user.id }, { labId: user.labId }] };
+
+    const result = await prisma.notification.deleteMany({ where });
+
+    log.info(
+      { user: user.email, count: result.count },
+      "Deleted all notifications",
+    );
+    return NextResponse.json({ success: true, count: result.count });
+  } catch (error: any) {
+    log.error({ err: error.message }, "Failed to clear notifications");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }
