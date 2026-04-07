@@ -4,22 +4,36 @@ import { prisma } from "@/lib/prisma";
 import { pveFetch } from "@/lib/proxmox";
 import { queryApi, bucket } from "@/lib/influx";
 import { getActionSession } from "@/lib/auth";
+import { logger } from "@/lib/logger";
+
+// Initialize child logger
+const log = logger.child({ module: "dashboard-bff" });
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const user = await getActionSession();
     const { searchParams } = new URL(req.url);
 
+    log.info(
+      { user: user.email, roles: user.role },
+      "Dashboard metrics aggregation started",
+    );
+
     // 1. RESOLVE SCOPE
     let targetLabId: string | null = null;
 
-    // Admin can see everything (null) or filter by a specific labId from query
     if (user.role.includes("ADMIN")) {
       targetLabId = searchParams.get("labId") || null;
-    }
-    // Faculty is STRICTLY locked to their own labId
-    else if (user.role.includes("FACULTY")) {
+      if (targetLabId)
+        log.debug({ targetLabId }, "Admin viewing scoped dashboard");
+    } else if (user.role.includes("FACULTY")) {
       if (!user.labId) {
+        log.warn(
+          { user: user.email },
+          "Faculty attempted dashboard access without labId",
+        );
         return NextResponse.json(
           { error: "No lab assigned to this faculty account" },
           { status: 403 },
@@ -28,18 +42,14 @@ export async function GET(req: NextRequest) {
       targetLabId = user.labId;
     }
 
-    // 2. FETCH VM REFERENCE DATA
-    // We get the hostnames and proxmoxIds for the filtered scope
-    const labVms = await prisma.vM.findMany({
-      where: targetLabId ? { labId: targetLabId } : {},
-      select: { proxmoxId: true, hostname: true },
-    });
-
-    const hostnames = labVms.map((v) => v.hostname);
-
-    // 3. CONCURRENT DATABASE FETCH
-    const [vmCount, facultyCount, totalLabs, recentLogs, labInfo] =
+    // 2. FETCH REFERENCE DATA (Parallelized)
+    log.debug("Fetching Postgres metadata and counts");
+    const [labVms, vmCount, facultyCount, totalLabs, recentLogs, labInfo] =
       await Promise.all([
+        prisma.vM.findMany({
+          where: targetLabId ? { labId: targetLabId } : {},
+          select: { proxmoxId: true, hostname: true },
+        }),
         prisma.vM.count({ where: targetLabId ? { labId: targetLabId } : {} }),
         prisma.user.count({
           where: { roleUsers: { some: { roles: { guardName: "FACULTY" } } } },
@@ -56,10 +66,12 @@ export async function GET(req: NextRequest) {
           : Promise.resolve(null),
       ]);
 
-    // 4. PROXMOX DATA (Filtered by the current scope)
+    const hostnames = labVms.map((v) => v.hostname);
+
+    // 3. PROXMOX DATA
+    log.debug("Requesting cluster resources from Proxmox");
     const pveRes = await pveFetch("/cluster/resources");
 
-    // Filter PVE resources: only QEMU VMs that exist in our database scope and are NOT templates
     const filteredPveVms = pveRes.data.filter(
       (r: any) =>
         r.type === "qemu" &&
@@ -67,7 +79,6 @@ export async function GET(req: NextRequest) {
         (targetLabId ? labVms.some((v) => v.proxmoxId === r.vmid) : true),
     );
 
-    // Calculate Storage (Always show cluster-wide totals for Admin)
     const storageRes = pveRes.data.filter((r: any) => r.type === "storage");
     const usedStorage = storageRes.reduce(
       (acc: number, s: any) => acc + (s.used || 0),
@@ -77,13 +88,16 @@ export async function GET(req: NextRequest) {
       (acc: number, s: any) => acc + (s.maxdisk || 0),
       0,
     );
-
     const activeCount = filteredPveVms.filter(
       (v: any) => v.status === "running",
     ).length;
 
-    // 5. INFLUXDB ANALYTICS (Filtered by the current scope's hostnames)
-    // If we have no hostnames (empty lab), we return an empty chart instead of crashing
+    log.debug(
+      { active: activeCount, storageUsed: usedStorage },
+      "Proxmox data resolved",
+    );
+
+    // 4. INFLUXDB ANALYTICS
     let hostFilter = "";
     if (targetLabId) {
       hostFilter =
@@ -100,6 +114,8 @@ export async function GET(req: NextRequest) {
         |> aggregateWindow(every: 2h, fn: mean)
     `;
 
+    log.trace({ cpuTrendQuery }, "Executing InfluxDB Flux query");
+
     const cpuTrend: any[] = [];
     await new Promise((res) => {
       queryApi.queryRows(cpuTrendQuery, {
@@ -111,11 +127,23 @@ export async function GET(req: NextRequest) {
           });
         },
         complete: () => res(true),
-        error: () => res(false),
+        error: (err) => {
+          log.error(
+            { err: err.message, query: cpuTrendQuery },
+            "InfluxDB Query failed in Dashboard",
+          );
+          res(false);
+        },
       });
     });
 
-    // 6. RESPONSE
+    const duration = Date.now() - startTime;
+    log.info(
+      { duration, lab: labInfo?.name || "Global" },
+      "Dashboard aggregation complete",
+    );
+
+    // 5. RESPONSE
     return NextResponse.json({
       labName: labInfo?.name || "Global Infrastructure",
       stats: {
@@ -129,16 +157,19 @@ export async function GET(req: NextRequest) {
         { name: "Online", value: activeCount, color: "#10b981" },
         {
           name: "Offline",
-          value: filteredPveVms.length - activeCount,
+          value: Math.max(0, filteredPveVms.length - activeCount),
           color: "#ef4444",
         },
       ],
       recentActivity: recentLogs,
     });
   } catch (error: any) {
-    console.error("Dashboard API Error:", error.message);
+    log.error(
+      { err: error.message, stack: error.stack },
+      "Internal failure in Dashboard BFF",
+    );
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "Internal Server Error", details: error.message },
       { status: 500 },
     );
   }
