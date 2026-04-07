@@ -1,0 +1,8 @@
+[submodule "nixos-config"]
+	path = nixos-config
+	url = git@github.com:ENDragnee/vdi_nixos_config.git
+	branch = main
+[submodule "vm-agent"]
+	path = vm-agent
+	url = git@github.com:ENDragnee/vdi-vm-agents.git
+	branch = main
