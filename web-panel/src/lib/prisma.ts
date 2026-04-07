@@ -14,14 +14,21 @@ const prismaClientSingleton = () => {
       "You are using a 'prisma://' URL with the 'pg' adapter. Please use the Direct Connection URL (starts with 'postgres://') or remove the adapter.",
     );
   }
+const isLocal =
+  connectionString.includes("localhost") ||
+  connectionString.includes("127.0.0.1");
 
-  const pool = new Pool({
-    connectionString,
-    ssl:
-      process.env.NODE_ENV === "production"
-        ? { rejectUnauthorized: false }
-        : undefined,
-  });
+const pool = new Pool({
+  connectionString,
+  ssl: isLocal ? false : { rejectUnauthorized: false },
+});
+  // const pool = new Pool({
+  //   connectionString,
+  //   ssl:
+  //     process.env.NODE_ENV === "production"
+  //       ? { rejectUnauthorized: false }
+  //       : undefined,
+  // });
 
   const adapter = new PrismaPg(pool);
 

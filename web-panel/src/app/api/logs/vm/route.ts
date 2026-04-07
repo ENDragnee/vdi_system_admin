@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     log.debug({ fluxQuery }, "Generated Flux Query for InfluxDB");
 
     const data: any[] = [];
-    return new Promise((resolve) => {
+    return new Promise<Response>((resolve) => {
       queryApi.queryRows(fluxQuery, {
         next(row, tableMeta) {
           const obj = tableMeta.toObject(row);
