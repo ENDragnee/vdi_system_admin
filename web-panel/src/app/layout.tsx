@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/provider/theme-provider";
 import SessionProviderWrapper from "@/provider/session-provider";
 import { QueryProvider } from "@/provider/query-provider";
+import { NotificationProvider } from "@/provider/notification-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,9 +35,11 @@ export default async function RootLayout({
         <SessionProviderWrapper>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
             <QueryProvider>
-              <div className="h-screen bg-background">
-                {children}
-              </div>
+              <NotificationProvider>
+                <div className="h-screen bg-background">
+                  {children}
+                </div>
+              </NotificationProvider>
             </QueryProvider>
           </ThemeProvider>
         </SessionProviderWrapper>

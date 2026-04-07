@@ -7,7 +7,8 @@ import {
   HardDrive,
   Library,
   Laptop,
-  History
+  History,
+  Bell
 } from "lucide-react";
 import { ReactNode } from "react";
 
@@ -57,6 +58,12 @@ export const adminNavConfig: NavItem[] = [
     requiredPermission: "faculty.manage",
   },
   {
+    name: "Notifications",
+    href: "/admin/notifications",
+    icon: <Bell className="w-5 h-5" />,
+    requiredPermission: "notifications.view",
+  },
+  {
     name: "System Logs",
     href: "/admin/logs/system",
     icon: <Activity className="w-5 h-5" />,
@@ -94,5 +101,11 @@ export const facultyNavConfig: NavItem[] = [
     href: '/faculty/analytics',
     icon: <History className="w-5 h-5" />,
     requiredPermission: 'faculty.logs.view',
+  },
+  {
+    name: "Alerts & Tasks",
+    href: "/faculty/notifications",
+    icon: <Bell className="w-5 h-5" />,
+    requiredPermission: "notifications.view",
   },
 ];

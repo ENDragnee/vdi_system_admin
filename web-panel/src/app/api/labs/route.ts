@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkPermission } from "@/lib/auth";
+import { createNotification } from "@/lib/notification-service";
 
 export async function GET(req: NextRequest) {
   if (!(await checkPermission("lab.view")))
@@ -51,6 +52,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     const lab = await prisma.lab.create({
       data: { name: body.name, description: body.description },
+    });
+
+    await createNotification({
+      title: "New Lab Created",
+      message: `Laboratory '${lab.name}' is now active.`,
+      type: "SUCCESS",
     });
 
     await prisma.log.create({

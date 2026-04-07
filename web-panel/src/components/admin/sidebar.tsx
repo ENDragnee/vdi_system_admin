@@ -5,7 +5,7 @@ import { ThemeSwitcher } from '@/components/theme-switcher';
 import { SidebarProfile } from './sidebar-profile';
 import { SidebarNav } from './sidebar-nav';
 import { adminNavConfig, facultyNavConfig } from '@/lib/nav-config';
-
+import { NotificationBell } from '../notification/notification-bell';
 export function Sidebar() {
   return (
     <aside className="w-64 bg-card border-r border-border h-screen sticky top-0 flex flex-col">
@@ -34,6 +34,7 @@ export function Sidebar() {
         <div className="px-4 py-2 border-t border-border">
           <div className="flex items-center justify-between px-4 py-2 bg-background/50 rounded-lg mb-2 border border-border/50">
             <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Theme</span>
+            <NotificationBell />
             <ThemeSwitcher />
           </div>
         </div>

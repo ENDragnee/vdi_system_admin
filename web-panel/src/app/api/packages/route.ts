@@ -2,6 +2,8 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkPermission } from "@/lib/auth";
+import { createNotification } from "@/lib/notification-service";
+import { title } from "node:process";
 
 export async function GET(req: NextRequest) {
   if (!(await checkPermission("packages.view"))) {
@@ -74,6 +76,13 @@ export async function POST(req: Request) {
         version: body.version,
       },
     });
+
+    await createNotification({
+      title: "Software Repository Updated",
+      message: `Package '${pkg.name}' is now available for deployment.`,
+      type: "INFO",
+    });
+
     return NextResponse.json(pkg);
   } catch (error) {
     return NextResponse.json(

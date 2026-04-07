@@ -3,7 +3,7 @@ import { prisma } from "../src/lib/prisma";
 
 /**
  * Define the full system structure.
- * slugs and guardNames must match your frontend nav-config and API guards.
+ * slugs and guardNames match frontend nav-config and API guards.
  */
 const SYSTEM_STRUCTURE = [
   {
@@ -14,6 +14,7 @@ const SYSTEM_STRUCTURE = [
       { name: "Manage Faculty Accounts", guard: "faculty.manage" },
       { name: "View System-wide Logs", guard: "logs.view" },
       { name: "Configure System Settings", guard: "settings.manage" },
+      { name: "View Lab Management", guard: "lab.view" },
     ],
     grantTo: ["ADMIN"],
   },
@@ -53,7 +54,13 @@ const SYSTEM_STRUCTURE = [
       { name: "View Lab Metrics", guard: "faculty.metrics.view" },
       { name: "View Lab History", guard: "faculty.logs.view" },
     ],
-    grantTo: ["ADMIN", "FACULTY"], // Admins get faculty views too
+    grantTo: ["ADMIN", "FACULTY"],
+  },
+  {
+    moduleName: "Notifications & Alerts",
+    moduleSlug: "notifications",
+    permissions: [{ name: "View Notifications", guard: "notifications.view" }],
+    grantTo: ["ADMIN", "FACULTY"], // Both roles need this for the Sidebar Bell and History page
   },
 ];
 
