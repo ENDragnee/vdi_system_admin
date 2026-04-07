@@ -8,14 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FacultyTable } from "@/components/faculty/faculty-table";
 import { FacultyUpsertModal } from "@/components/faculty/faculty-upsert-modal";
-import { LabPagination } from "@/components/lab/lab-pagination"; // Reusing Pagination
+import { FacultyPasswordModal } from "@/components/faculty/faculty-password-modal";
+import { LabPagination } from "@/components/lab/lab-pagination";
 
 export default function FacultyManagementPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState(null);
+
+  // States for Modals
+  const [isUpsertOpen, setIsUpsertOpen] = useState(false);
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [targetMember, setTargetMember] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["faculty", page, search],
@@ -28,15 +32,15 @@ export default function FacultyManagementPage() {
   });
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-8 space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
-            <Users className="text-primary" /> Faculty Registry
+          <h1 className="text-4xl font-black tracking-tighter flex items-center gap-3">
+            <Users className="text-primary w-10 h-10" /> Faculty Registry
           </h1>
-          <p className="text-muted-foreground font-medium">Manage academic staff and lab access permissions</p>
+          <p className="text-muted-foreground font-medium uppercase text-xs tracking-widest mt-1">Identity and access control</p>
         </div>
-        <Button onClick={() => { setEditingMember(null); setIsModalOpen(true); }} className="shadow-lg">
+        <Button onClick={() => { setTargetMember(null); setIsUpsertOpen(true); }} className="shadow-lg rounded-xl h-11 px-6 font-bold uppercase text-xs">
           <Plus className="w-4 h-4 mr-2" /> Add Faculty
         </Button>
       </div>
@@ -44,8 +48,8 @@ export default function FacultyManagementPage() {
       <div className="relative">
         <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
         <Input
-          placeholder="Search faculty by name or email..."
-          className="pl-10 h-12 text-lg shadow-sm"
+          placeholder="Search by name or email..."
+          className="pl-10 h-12 text-lg shadow-sm bg-card border-border/40"
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1); }}
         />
@@ -59,17 +63,25 @@ export default function FacultyManagementPage() {
         <div className="space-y-4">
           <FacultyTable
             data={data?.data || []}
-            onEdit={(m: any) => { setEditingMember(m); setIsModalOpen(true); }}
+            onEdit={(m: any) => { setTargetMember(m); setIsUpsertOpen(true); }}
+            onPasswordReset={(m: any) => { setTargetMember(m); setIsPasswordOpen(true); }}
             onDelete={(id: string) => confirm("Permanently delete this member?") && deleteMutation.mutate(id)}
           />
           <LabPagination meta={data?.meta} onPageChange={setPage} />
         </div>
       )}
 
+      {/* MODALS */}
       <FacultyUpsertModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        editingMember={editingMember}
+        isOpen={isUpsertOpen}
+        onClose={() => setIsUpsertOpen(false)}
+        editingMember={targetMember}
+      />
+
+      <FacultyPasswordModal
+        isOpen={isPasswordOpen}
+        onClose={() => setIsPasswordOpen(false)}
+        member={targetMember}
       />
     </div>
   );
