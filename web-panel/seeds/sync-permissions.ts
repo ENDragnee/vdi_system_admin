@@ -62,6 +62,14 @@ const SYSTEM_STRUCTURE = [
     permissions: [{ name: "View Notifications", guard: "notifications.view" }],
     grantTo: ["ADMIN", "FACULTY"], // Both roles need this for the Sidebar Bell and History page
   },
+  {
+    moduleName: "User Security",
+    moduleSlug: "security",
+    permissions: [
+      { name: "Reset User Passwords", guard: "user.password.reset" },
+    ],
+    grantTo: ["ADMIN"],
+  },
 ];
 
 async function main() {

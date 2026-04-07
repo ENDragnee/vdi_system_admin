@@ -27,6 +27,10 @@ export async function CreateVmAction(
     const vmid = parseInt(String(proxmoxId), 10);
     const templateId = parseInt(String(TEMPLATE_ID), 10);
 
+    if (isNaN(vmid) || vmid < 100) {
+      throw new Error("Invalid VM ID. It must be a number >= 100.");
+    }
+
     // 1. Proxmox Clone
     const cloneResponse = await pveFetch(
       `/nodes/${PROXMOX_NODE}/qemu/${templateId}/clone`,
@@ -36,21 +40,22 @@ export async function CreateVmAction(
     await waitForTask(PROXMOX_NODE, cloneResponse.data);
 
     // 2. Proxmox Config
+    // FIX: Removed 'hostname' parameter as PVE API rejects it for QEMU in this context.
+    // Setting 'name' is the standard way to define the VM identity.
     await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${vmid}/config`, "POST", {
       name: name,
-      hostname: hostname,
     });
 
-    // 3. Start
+    // 3. Start VM
     await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${vmid}/status/start`, "POST");
 
-    // 4. Database Write
+    // 4. Update Database
     const newVm = await prisma.vM.create({
-      data: { proxmoxId: vmid, hostname, labId },
+      data: { proxmoxId: vmid, hostname: hostname, labId: labId },
       include: { lab: true },
     });
 
-    // 5. System Log
+    // 5. System Log & Notification
     await prisma.log.create({
       data: {
         type: "VM_PROVISIONED",
@@ -62,7 +67,6 @@ export async function CreateVmAction(
       },
     });
 
-    // 6. CREATE NOTIFICATION
     await prisma.notification.create({
       data: {
         title: "New VM Provisioned",
@@ -72,6 +76,7 @@ export async function CreateVmAction(
         link: "/admin/instances",
       },
     });
+
     const io = (global as any).io;
     if (io) {
       io.emit("new-notification", {
@@ -80,6 +85,7 @@ export async function CreateVmAction(
         type: "SUCCESS",
       });
     }
+
     revalidatePath("/admin/instances");
     return { success: true };
   } catch (error: any) {

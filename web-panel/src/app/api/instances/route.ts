@@ -1,9 +1,12 @@
+// app/api/instances/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { pveFetch, GetVmIp } from "@/lib/proxmox";
 import { getActionSession } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 const PROXMOX_NODE = process.env.PROXMOX_NODE || "pve";
+const log = logger.child({ module: "instance-api" });
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,20 +15,11 @@ export async function GET(req: NextRequest) {
 
     // 1. RESOLVE TARGET LAB ID
     let targetLabId: string | null = null;
-
-    // PRIORITY 1: If user is an ADMIN, they see everything by default.
-    // They can optionally filter by a labId provided in the URL.
     if (user.role.includes("ADMIN")) {
       targetLabId = searchParams.get("labId") || null;
-    }
-    // PRIORITY 2: If user is ONLY a FACULTY, force their session's labId.
-    else if (user.role.includes("FACULTY")) {
-      if (!user.labId) {
-        return NextResponse.json(
-          { error: "Forbidden: No lab assigned to this faculty account" },
-          { status: 403 },
-        );
-      }
+    } else if (user.role.includes("FACULTY")) {
+      if (!user.labId)
+        return NextResponse.json({ error: "No lab assigned" }, { status: 403 });
       targetLabId = user.labId;
     }
 
@@ -35,16 +29,16 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     // 2. BUILD PRISMA FILTER
-    // We only add the labId filter if targetLabId is not null.
     const where: any = {
       AND: [
-        targetLabId ? { labId: targetLabId } : {},
+        // Only apply labId filter if it's not null and not "all"
+        targetLabId && targetLabId !== "all" ? { labId: targetLabId } : {},
         search ? { hostname: { contains: search, mode: "insensitive" } } : {},
       ],
     };
 
-    // 3. FETCH DATABASE DATA
-    const [dbVms, total] = await prisma.$transaction([
+    // 3. FETCH DATA & LABS LIST
+    const [dbVms, total, allLabs] = await prisma.$transaction([
       prisma.vM.findMany({
         where,
         include: { lab: true },
@@ -53,13 +47,13 @@ export async function GET(req: NextRequest) {
         take: limit,
       }),
       prisma.vM.count({ where }),
+      // FETCH ALL LABS so the dropdown isn't empty!
+      prisma.lab.findMany({ select: { id: true, name: true } }),
     ]);
 
-    // 4. FETCH LIVE DATA FROM PROXMOX
     const pveResponse = await pveFetch("/cluster/resources");
     const pveVms = pveResponse.data.filter((r: any) => r.type === "qemu");
 
-    // 5. MERGE DATA & RESOLVE IPs
     const instances = await Promise.all(
       dbVms.map(async (dbVm) => {
         const pveVm = pveVms.find((p: any) => p.vmid === dbVm.proxmoxId);
@@ -72,10 +66,8 @@ export async function GET(req: NextRequest) {
           status = pveVm.status === "running" ? "online" : "offline";
           cpu = Math.round((pveVm.cpu || 0) * 100);
           ram = pveVm.maxmem ? Math.round((pveVm.mem / pveVm.maxmem) * 100) : 0;
-
-          if (status === "online") {
+          if (status === "online")
             ip = await GetVmIp(PROXMOX_NODE, dbVm.proxmoxId);
-          }
         }
 
         return {
@@ -94,8 +86,10 @@ export async function GET(req: NextRequest) {
       }),
     );
 
+    // 4. RETURN MERGED PAYLOAD
     return NextResponse.json({
       instances,
+      labs: allLabs, // Critical: populated labs list
       meta: {
         total,
         page,
@@ -104,7 +98,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("Instances API Error:", error.message);
+    log.error({ err: error.message }, "Instances GET Failure");
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

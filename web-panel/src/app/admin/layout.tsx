@@ -1,19 +1,16 @@
 import { Sidebar } from '@/components/admin/sidebar';
-import SessionProviderWrapper from '@/provider/session-provider'; // Assuming this is your wrapper
+import { protectRoute } from '@/lib/role-guard';
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // Server-side check
+  await protectRoute("ADMIN");
+
   return (
-    <SessionProviderWrapper>
-      <div className="flex h-screen bg-background">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </SessionProviderWrapper>
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <main className="flex-1 overflow-y-auto">
+        {children}
+      </main>
+    </div>
   );
 }
