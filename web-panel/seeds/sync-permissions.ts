@@ -1,96 +1,104 @@
-// seeds/sync-permissions.ts
 import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 
-// 1. DEFINE YOUR STRUCTURE HERE
-// To add new features, just add objects to this array.
-const PERMISSION_STRUCTURE = [
+/**
+ * Define the full system structure.
+ * slugs and guardNames must match your frontend nav-config and API guards.
+ */
+const SYSTEM_STRUCTURE = [
   {
-    moduleName: "Core System",
-    moduleSlug: "core",
+    moduleName: "Core Administration",
+    moduleSlug: "admin-core",
     permissions: [
-      { name: "View Dashboard", guard: "dashboard.view" },
-      { name: "Manage Faculty", guard: "faculty.manage" },
-      { name: "View System Logs", guard: "logs.view" },
-      { name: "Manage Settings", guard: "settings.manage" },
+      { name: "View Admin Dashboard", guard: "dashboard.view" },
+      { name: "Manage Faculty Accounts", guard: "faculty.manage" },
+      { name: "View System-wide Logs", guard: "logs.view" },
+      { name: "Configure System Settings", guard: "settings.manage" },
     ],
+    grantTo: ["ADMIN"],
   },
   {
-    moduleName: "VM Management",
-    moduleSlug: "vm",
+    moduleName: "Infrastructure Management",
+    moduleSlug: "vm-mgmt",
     permissions: [
-      { name: "View VMs", guard: "vm.view" },
-      { name: "Create VMs", guard: "vm.create" },
-      { name: "Delete VMs", guard: "vm.delete" },
-      { name: "Start VMs", guard: "vm.start" },
-      { name: "Stop VMs", guard: "vm.stop" },
-      { name: "View VM Logs", guard: "vm.logs.view" },
+      { name: "View All Instances", guard: "vm.view" },
+      { name: "Provision New VMs", guard: "vm.create" },
+      { name: "Destroy VM Instances", guard: "vm.delete" },
+      { name: "Global Power Control", guard: "vm.control" },
     ],
+    grantTo: ["ADMIN"],
   },
   {
-    moduleName: "Package Management",
+    moduleName: "Software Repository",
     moduleSlug: "packages",
     permissions: [
-      { name: "View Packages", guard: "packages.view" },
-      { name: "Create Packages", guard: "packages.create" },
-      { name: "Update Packages", guard: "packages.update" },
-      { name: "Delete Packages", guard: "packages.delete" },
-      { name: "Manage Package Assignments", guard: "packages.manage" },
+      { name: "View Package List", guard: "packages.view" },
+      { name: "Manage Global Packages", guard: "packages.manage" },
     ],
+    grantTo: ["ADMIN"],
   },
   {
-    moduleName: "Lab Management",
-    moduleSlug: "lab",
-    permissions: [
-      { name: "View Labs", guard: "lab.view" },
-      { name: "Create Labs", guard: "lab.create" },
-      { name: "Update Labs", guard: "lab.update" },
-      { name: "Delete Labs", guard: "lab.delete" },
-    ],
-  },
-  {
-    moduleName: "Logging & Audit",
-    moduleSlug: "logs",
-    permissions: [
-      { name: "View System Logs", guard: "logs.view" },
-      { name: "Export Logs", guard: "logs.export" },
-    ],
-  },
-  {
-    moduleName: "Live Metrics",
+    moduleName: "Telemetry Services",
     moduleSlug: "metrics",
     permissions: [{ name: "View Real-time Metrics", guard: "metrics.view" }],
+    grantTo: ["ADMIN"],
+  },
+  {
+    moduleName: "Faculty Portal",
+    moduleSlug: "faculty-portal",
+    permissions: [
+      { name: "View Faculty Dashboard", guard: "faculty.dashboard.view" },
+      { name: "View Lab Instances", guard: "faculty.vm.view" },
+      { name: "Control Lab Instances", guard: "faculty.vm.control" },
+      { name: "View Lab Metrics", guard: "faculty.metrics.view" },
+      { name: "View Lab History", guard: "faculty.logs.view" },
+    ],
+    grantTo: ["ADMIN", "FACULTY"], // Admins get faculty views too
   },
 ];
 
 async function main() {
-  console.log("🔄 Starting Permission Sync...");
+  console.log("🚀 Starting Verbose Permission Synchronization...\n");
 
-  // 2. Ensure the ADMIN role exists
+  // 1. Fetch Roles
   const adminRole = await prisma.role.findFirst({
     where: { guardName: "ADMIN" },
   });
+  const facultyRole = await prisma.role.findFirst({
+    where: { guardName: "FACULTY" },
+  });
 
-  if (!adminRole) {
-    console.error("❌ ADMIN role not found. Please run the user seeder first.");
+  if (!adminRole || !facultyRole) {
+    console.error(
+      "❌ Critical Error: ADMIN or FACULTY roles not found in DB. Run user seeder first.",
+    );
     process.exit(1);
   }
 
-  for (const item of PERMISSION_STRUCTURE) {
-    // 3. Upsert Module
+  console.log(
+    `🔎 Found Roles: ADMIN (${adminRole.id}), FACULTY (${facultyRole.id})`,
+  );
+
+  for (const group of SYSTEM_STRUCTURE) {
+    console.log(
+      `\n📦 Processing Module: ${group.moduleName} [/${group.moduleSlug}]`,
+    );
+
+    // 2. Upsert Module
     const mod = await prisma.module.upsert({
-      where: { id: `mod-${item.moduleSlug}` },
-      update: { name: item.moduleName },
+      where: { id: `mod-${group.moduleSlug}` },
+      update: { name: group.moduleName, slug: group.moduleSlug },
       create: {
-        id: `mod-${item.moduleSlug}`,
-        name: item.moduleName,
-        slug: item.moduleSlug,
+        id: `mod-${group.moduleSlug}`,
+        name: group.moduleName,
+        slug: group.moduleSlug,
         isActive: true,
       },
     });
+    console.log(`   ✅ Module Synced: ${mod.id}`);
 
-    for (const p of item.permissions) {
-      // 4. Upsert Permission
+    for (const p of group.permissions) {
+      // 3. Upsert Permission
       const perm = await prisma.permission.upsert({
         where: { id: `perm-${p.guard}` },
         update: { name: p.name, moduleId: mod.id },
@@ -101,35 +109,33 @@ async function main() {
           moduleId: mod.id,
         },
       });
+      console.log(`      🔑 Permission: ${perm.guardName} (${perm.name})`);
 
-      // 5. Sync to ADMIN role (The "Update" part)
-      // We use upsert here to ensure the link exists without erroring if it already does
-      await prisma.permissionRole.upsert({
-        where: {
-          // In your schema this isn't unique by default, so we use the ID pattern
-          // used in the previous step or findFirst logic.
-          id: `link-${adminRole.id}-${perm.id}`,
-        },
-        update: {},
-        create: {
-          id: `link-${adminRole.id}-${perm.id}`,
-          roleId: adminRole.id,
-          permissionId: perm.id,
-        },
-      });
+      // 4. Link to Roles defined in 'grantTo'
+      for (const roleGuard of group.grantTo) {
+        const targetRole = roleGuard === "ADMIN" ? adminRole : facultyRole;
 
-      console.log(`✅ Synced: [${item.moduleName}] -> ${p.name}`);
+        const link = await prisma.permissionRole.upsert({
+          where: { id: `link-${targetRole.id}-${perm.id}` },
+          update: {},
+          create: {
+            id: `link-${targetRole.id}-${perm.id}`,
+            roleId: targetRole.id,
+            permissionId: perm.id,
+          },
+        });
+        console.log(`         🔗 Linked to Role: ${roleGuard}`);
+      }
     }
   }
 
-  console.log(
-    "\n✨ Sync Complete. All new permissions have been granted to ADMIN.",
-  );
+  console.log("\n✨ Sync Complete. Sidebar and API guards are now aligned. ✅");
 }
 
 main()
   .then(() => prisma.$disconnect())
   .catch((e) => {
+    console.error("\n🛑 Seeder Failed:");
     console.error(e);
     prisma.$disconnect();
     process.exit(1);

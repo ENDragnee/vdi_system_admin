@@ -5,10 +5,9 @@ import {
   Server,
   Activity,
   HardDrive,
-  BookOpen,
   Library,
-  Settings,
-  Laptop
+  Laptop,
+  History
 } from "lucide-react";
 import { ReactNode } from "react";
 
@@ -71,20 +70,29 @@ export const adminNavConfig: NavItem[] = [
   },
 ];
 
-// export const facultyNavConfig: NavItem[] = [
-//   {
-//     name: "Faculty Panel",
-//     href: "/faculty/dashboard",
-//     icon: <BookOpen className="w-5 h-5" />,
-//     requiredPermission: "faculty.dashboard.view",
-//   },
-// ];
-//
-// export const settingsNavConfig: NavItem[] = [
-//   {
-//     name: "Settings",
-//     href: "/admin/settings",
-//     icon: <Settings className="w-5 h-5" />,
-//     requiredPermission: "settings.manage",
-//   },
-// ];
+export const facultyNavConfig: NavItem[] = [
+  {
+    name: 'Lab Overview',
+    href: '/faculty/dashboard',
+    icon: <LayoutDashboard className="w-5 h-5" />,
+    requiredPermission: 'faculty.dashboard.view',
+  },
+  {
+    name: 'My Instances',
+    href: '/faculty/instances',
+    icon: <Server className="w-5 h-5" />,
+    requiredPermission: 'faculty.vm.view',
+  },
+  {
+    name: 'Live Telemetry',
+    href: '/faculty/metrics',
+    icon: <Activity className="w-5 h-5" />,
+    requiredPermission: 'faculty.metrics.view',
+  },
+  {
+    name: 'Lab Analytics',
+    href: '/faculty/analytics',
+    icon: <History className="w-5 h-5" />,
+    requiredPermission: 'faculty.logs.view',
+  },
+];
