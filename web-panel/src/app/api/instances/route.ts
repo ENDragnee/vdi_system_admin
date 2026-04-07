@@ -1,3 +1,4 @@
+// app/api/instances/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { pveFetch, GetVmIp } from "@/lib/proxmox";
@@ -5,59 +6,39 @@ import { getActionSession } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 const PROXMOX_NODE = process.env.PROXMOX_NODE || "pve";
-
-// Initialize scoped logger
 const log = logger.child({ module: "instance-api" });
 
 export async function GET(req: NextRequest) {
-  const startTime = Date.now();
-
   try {
     const user = await getActionSession();
     const { searchParams } = new URL(req.url);
 
-    log.info(
-      { user: user.email, roles: user.role },
-      "Instance fetch request initiated",
-    );
-
     // 1. RESOLVE TARGET LAB ID
     let targetLabId: string | null = null;
-
     if (user.role.includes("ADMIN")) {
       targetLabId = searchParams.get("labId") || null;
-      if (targetLabId)
-        log.debug({ targetLabId }, "Admin filtering by specific lab");
     } else if (user.role.includes("FACULTY")) {
-      if (!user.labId) {
-        log.warn(
-          { user: user.email },
-          "Faculty access denied: No labId in session",
-        );
-        return NextResponse.json(
-          { error: "Forbidden: No lab assigned to this faculty account" },
-          { status: 403 },
-        );
-      }
+      if (!user.labId)
+        return NextResponse.json({ error: "No lab assigned" }, { status: 403 });
       targetLabId = user.labId;
     }
 
-    // 2. PARSE PAGINATION
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "12");
     const search = searchParams.get("search") || "";
     const skip = (page - 1) * limit;
 
-    // 3. FETCH DATABASE DATA
+    // 2. BUILD PRISMA FILTER
     const where: any = {
       AND: [
-        targetLabId ? { labId: targetLabId } : {},
+        // Only apply labId filter if it's not null and not "all"
+        targetLabId && targetLabId !== "all" ? { labId: targetLabId } : {},
         search ? { hostname: { contains: search, mode: "insensitive" } } : {},
       ],
     };
 
-    log.debug({ page, limit, search }, "Querying Postgres for VM records");
-    const [dbVms, total] = await prisma.$transaction([
+    // 3. FETCH DATA & LABS LIST
+    const [dbVms, total, allLabs] = await prisma.$transaction([
       prisma.vM.findMany({
         where,
         include: { lab: true },
@@ -66,18 +47,13 @@ export async function GET(req: NextRequest) {
         take: limit,
       }),
       prisma.vM.count({ where }),
+      // FETCH ALL LABS so the dropdown isn't empty!
+      prisma.lab.findMany({ select: { id: true, name: true } }),
     ]);
 
-    // 4. FETCH LIVE DATA FROM PROXMOX
-    log.debug("Requesting live cluster resources from Proxmox");
     const pveResponse = await pveFetch("/cluster/resources");
     const pveVms = pveResponse.data.filter((r: any) => r.type === "qemu");
 
-    // 5. MERGE DATA & RESOLVE IPs
-    log.debug(
-      { count: dbVms.length },
-      "Merging DB records with live Proxmox metrics",
-    );
     const instances = await Promise.all(
       dbVms.map(async (dbVm) => {
         const pveVm = pveVms.find((p: any) => p.vmid === dbVm.proxmoxId);
@@ -90,12 +66,8 @@ export async function GET(req: NextRequest) {
           status = pveVm.status === "running" ? "online" : "offline";
           cpu = Math.round((pveVm.cpu || 0) * 100);
           ram = pveVm.maxmem ? Math.round((pveVm.mem / pveVm.maxmem) * 100) : 0;
-
-          if (status === "online") {
-            // We use debug here because this can be slow if many VMs are starting
-            log.trace({ vmid: dbVm.proxmoxId }, "Resolving IP via Guest Agent");
+          if (status === "online")
             ip = await GetVmIp(PROXMOX_NODE, dbVm.proxmoxId);
-          }
         }
 
         return {
@@ -114,14 +86,10 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    const duration = Date.now() - startTime;
-    log.info(
-      { duration, resultCount: instances.length, totalCount: total },
-      "Instance fetch completed successfully",
-    );
-
+    // 4. RETURN MERGED PAYLOAD
     return NextResponse.json({
       instances,
+      labs: allLabs, // Critical: populated labs list
       meta: {
         total,
         page,
@@ -130,15 +98,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    log.error(
-      {
-        err: error.message,
-        stack: error.stack,
-        context: "Instance API Failure",
-      },
-      "Failed to process instances GET request",
-    );
-
+    log.error({ err: error.message }, "Instances GET Failure");
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },
