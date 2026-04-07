@@ -63,6 +63,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           role: userRoles,
           permissions: Array.from(new Set(rolePermissions)),
+          labId: user.labId,
         };
       },
     }),
@@ -101,6 +102,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = user.role;
         token.permissions = user.permissions;
+        token.labId = user.labId;
         token.token = sessionToken;
         token.invalid = false;
         token.exp = Math.floor(expiresAt.getTime() / 1000);
@@ -135,6 +137,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.permissions = token.permissions;
+        session.user.labId = token.labId;
       }
       return session;
     },

@@ -37,7 +37,7 @@ export function SidebarProfile() {
       <Button
         variant="outline"
         className="w-full justify-start gap-3 text-foreground hover:bg-destructive hover:text-destructive-foreground"
-        onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+        onClick={() => signOut({ callbackUrl: '/auth' })}
       >
         <LogOut className="w-5 h-5" />
         <span>Sign Out</span>

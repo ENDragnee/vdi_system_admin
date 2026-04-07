@@ -1,38 +1,74 @@
-import { NextResponse } from "next/server";
+// @/app/api/dashboard/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { pveFetch } from "@/lib/proxmox";
 import { queryApi, bucket } from "@/lib/influx";
-import { checkPermission } from "@/lib/auth";
+import { getActionSession } from "@/lib/auth";
 
-export async function GET() {
-  if (!(await checkPermission("dashboard.view"))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export async function GET(req: NextRequest) {
   try {
-    // 1. POSTGRES DATA
-    const [totalInstances, facultyCount, totalLabs, recentLogs] =
-      await prisma.$transaction([
-        prisma.vM.count(),
+    const user = await getActionSession();
+    const { searchParams } = new URL(req.url);
+
+    // 1. RESOLVE SCOPE
+    let targetLabId: string | null = null;
+
+    // Admin can see everything (null) or filter by a specific labId from query
+    if (user.role.includes("ADMIN")) {
+      targetLabId = searchParams.get("labId") || null;
+    }
+    // Faculty is STRICTLY locked to their own labId
+    else if (user.role.includes("FACULTY")) {
+      if (!user.labId) {
+        return NextResponse.json(
+          { error: "No lab assigned to this faculty account" },
+          { status: 403 },
+        );
+      }
+      targetLabId = user.labId;
+    }
+
+    // 2. FETCH VM REFERENCE DATA
+    // We get the hostnames and proxmoxIds for the filtered scope
+    const labVms = await prisma.vM.findMany({
+      where: targetLabId ? { labId: targetLabId } : {},
+      select: { proxmoxId: true, hostname: true },
+    });
+
+    const hostnames = labVms.map((v) => v.hostname);
+
+    // 3. CONCURRENT DATABASE FETCH
+    const [vmCount, facultyCount, totalLabs, recentLogs, labInfo] =
+      await Promise.all([
+        prisma.vM.count({ where: targetLabId ? { labId: targetLabId } : {} }),
         prisma.user.count({
           where: { roleUsers: { some: { roles: { guardName: "FACULTY" } } } },
         }),
         prisma.lab.count(),
         prisma.log.findMany({
+          where: targetLabId ? { labId: targetLabId } : {},
           take: 10,
           orderBy: { createdAt: "desc" },
           include: { user: { select: { name: true } } },
         }),
+        targetLabId
+          ? prisma.lab.findUnique({ where: { id: targetLabId } })
+          : Promise.resolve(null),
       ]);
 
-    // 2. PROXMOX DATA (Correct: Use PVE API for hardware totals/counts)
-    const pveResources = await pveFetch("/cluster/resources");
-    const pveVms = pveResources.data.filter(
-      (r: any) => r.type === "qemu" && r.template !== 1,
+    // 4. PROXMOX DATA (Filtered by the current scope)
+    const pveRes = await pveFetch("/cluster/resources");
+
+    // Filter PVE resources: only QEMU VMs that exist in our database scope and are NOT templates
+    const filteredPveVms = pveRes.data.filter(
+      (r: any) =>
+        r.type === "qemu" &&
+        r.template !== 1 &&
+        (targetLabId ? labVms.some((v) => v.proxmoxId === r.vmid) : true),
     );
-    const storageRes = pveResources.data.filter(
-      (r: any) => r.type === "storage",
-    );
+
+    // Calculate Storage (Always show cluster-wide totals for Admin)
+    const storageRes = pveRes.data.filter((r: any) => r.type === "storage");
     const usedStorage = storageRes.reduce(
       (acc: number, s: any) => acc + (s.used || 0),
       0,
@@ -41,91 +77,69 @@ export async function GET() {
       (acc: number, s: any) => acc + (s.maxdisk || 0),
       0,
     );
-    const activeInstances = pveVms.filter(
+
+    const activeCount = filteredPveVms.filter(
       (v: any) => v.status === "running",
     ).length;
 
-    const instanceDistribution = [
-      { name: "Online", value: activeInstances, color: "#10b981" },
-      {
-        name: "Offline",
-        value: pveVms.filter((v: any) => v.status === "stopped").length,
-        color: "#ef4444",
-      },
-      {
-        name: "Other",
-        value:
-          pveVms.length -
-          activeInstances -
-          pveVms.filter((v: any) => v.status === "stopped").length,
-        color: "#f59e0b",
-      },
-    ];
+    // 5. INFLUXDB ANALYTICS (Filtered by the current scope's hostnames)
+    // If we have no hostnames (empty lab), we return an empty chart instead of crashing
+    let hostFilter = "";
+    if (targetLabId) {
+      hostFilter =
+        hostnames.length > 0
+          ? `|> filter(fn: (r) => ${hostnames.map((h) => `r["host"] == "${h}"`).join(" or ")})`
+          : `|> filter(fn: (r) => false)`;
+    }
 
-    // 3. INFLUXDB DATA (Using Linux measurement names: cpu, mem)
     const cpuTrendQuery = `
       from(bucket: "${bucket}")
         |> range(start: -24h)
         |> filter(fn: (r) => r["_measurement"] == "cpu" and r["_field"] == "usage_active" and r["cpu"] == "cpu-total")
+        ${hostFilter}
         |> aggregateWindow(every: 2h, fn: mean)
     `;
 
-    const weeklyUtilQuery = `
-      from(bucket: "${bucket}")
-        |> range(start: -7d)
-        |> filter(fn: (r) => (r["_measurement"] == "mem" and r["_field"] == "used_percent") or (r["_measurement"] == "disk" and r["_field"] == "used_percent"))
-        |> aggregateWindow(every: 1d, fn: mean)
-        |> pivot(rowKey:["_time"], columnKey: ["_measurement"], valueColumn: "_value")
-    `;
-
     const cpuTrend: any[] = [];
-    const weeklyUtil: any[] = [];
+    await new Promise((res) => {
+      queryApi.queryRows(cpuTrendQuery, {
+        next: (row, meta) => {
+          const obj = meta.toObject(row);
+          cpuTrend.push({
+            time: new Date(obj._time).getHours() + ":00",
+            usage: Math.round(obj._value || 0),
+          });
+        },
+        complete: () => res(true),
+        error: () => res(false),
+      });
+    });
 
-    await Promise.all([
-      new Promise((res) => {
-        queryApi.queryRows(cpuTrendQuery, {
-          next: (row, meta) => {
-            const obj = meta.toObject(row);
-            cpuTrend.push({
-              time: new Date(obj._time).getHours() + ":00",
-              usage: Math.round(obj._value || 0),
-            });
-          },
-          complete: () => res(true),
-          error: () => res(false),
-        });
-      }),
-      new Promise((res) => {
-        queryApi.queryRows(weeklyUtilQuery, {
-          next: (row, meta) => {
-            const obj = meta.toObject(row);
-            weeklyUtil.push({
-              day: new Date(obj._time).toLocaleDateString("en-US", {
-                weekday: "short",
-              }),
-              ram: Math.round(obj.mem || 0),
-              storage: Math.round(obj.disk || 0),
-            });
-          },
-          complete: () => res(true),
-          error: () => res(false),
-        });
-      }),
-    ]);
-
+    // 6. RESPONSE
     return NextResponse.json({
+      labName: labInfo?.name || "Global Infrastructure",
       stats: {
-        instances: { active: activeInstances, total: pveVms.length },
+        instances: { active: activeCount, total: vmCount },
+        storage: { used: usedStorage, total: totalStorage },
         faculties: facultyCount,
         labs: totalLabs,
-        storage: { used: usedStorage, total: totalStorage },
       },
       cpuTrend,
-      instanceDistribution,
-      weeklyUtil,
+      instanceDistribution: [
+        { name: "Online", value: activeCount, color: "#10b981" },
+        {
+          name: "Offline",
+          value: filteredPveVms.length - activeCount,
+          color: "#ef4444",
+        },
+      ],
       recentActivity: recentLogs,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Dashboard API Error:", error.message);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }
