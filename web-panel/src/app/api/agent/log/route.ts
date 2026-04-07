@@ -10,54 +10,75 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    // Use targetId as sent by the agent
-    const { type, severity, message, targetName, targetId, details } = body;
+    const { type, severity, message, targetName, vmId, details } = body;
 
-    console.log(
-      `📥 Webhook: ID ${targetId} | Host: ${targetName} | Type: ${type}`,
-    );
+    console.log(`📥 Webhook: ID ${vmId} | Host: ${targetName} | Type: ${type}`);
 
-    // --- THE FIX: PREVENT PRISMA CRASH ---
+    // 1. Resolve VM
     let vm = null;
-    if (targetId) {
-      vm = await prisma.vM.findUnique({
-        where: { id: targetId },
-      });
+    if (vmId) {
+      vm = await prisma.vM.findUnique({ where: { id: vmId } });
     }
 
-    // Fallback: If ID is missing, try matching by hostname
     if (!vm && targetName) {
       vm = await prisma.vM.findFirst({
         where: { hostname: { equals: targetName, mode: "insensitive" } },
       });
     }
 
-    // 2. Create the log entry (Always works even if vm is null)
-    const newLog = await prisma.log.create({
+    // 2. Create the system log entry
+    await prisma.log.create({
       data: {
         type: type,
         severity: severity,
         message: message,
         targetName: targetName || "unknown",
-        targetId: vm?.id || targetId || null,
+        targetId: vm?.id || vmId || null,
         details: details ? { output: details } : {},
       },
     });
 
-    // 3. Update Package Statuses
+    // 3. Process Build Results
     if (vm) {
-      const statusUpdate =
-        type === "NIX_BUILD_SUCCESS"
-          ? "INSTALLED"
-          : type === "NIX_BUILD_FAILED"
-            ? "FAILED"
-            : null;
+      const isSuccess = type === "NIX_BUILD_SUCCESS";
+      const isFailure = type === "NIX_BUILD_FAILED";
 
-      if (statusUpdate) {
+      if (isSuccess || isFailure) {
+        // A. Update Package Statuses in DB
         await prisma.vMPackage.updateMany({
           where: { vmId: vm.id, status: "PENDING" },
-          data: { status: statusUpdate },
+          data: { status: isSuccess ? "INSTALLED" : "FAILED" },
         });
+
+        // B. Create Persistent Notification in DB
+        const notificationTitle = isSuccess ? "Sync Successful" : "Sync Failed";
+        const notificationMessage = isSuccess
+          ? `VM ${vm.hostname} has successfully applied the new package configuration.`
+          : `VM ${vm.hostname} failed to rebuild. Manual intervention may be required.`;
+        const notificationType = isSuccess ? "SUCCESS" : "ERROR";
+
+        await prisma.notification.create({
+          data: {
+            title: notificationTitle,
+            message: notificationMessage,
+            type: notificationType,
+            labId: vm.labId,
+            link: `/admin/logs/system?search=${vm.hostname}`,
+          },
+        });
+
+        // C. TRIGGER REAL-TIME POPUP (WebSocket)
+        // Access the 'io' instance we attached to global in server.ts
+        const io = (global as any).io;
+        if (io) {
+          io.emit("new-notification", {
+            title: notificationTitle,
+            message: notificationMessage,
+            type: notificationType, // Sonner listener uses this for color/icons
+          });
+        }
+
+        console.log(`🔔 Notification & Socket emitted for ${vm.hostname}`);
       }
     }
 

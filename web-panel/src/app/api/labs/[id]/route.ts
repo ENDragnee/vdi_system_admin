@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkPermission } from "@/lib/auth";
 import { RequestParams } from "@/types/request-param";
+import { createNotification } from "@/lib/notification-service";
 
 export async function PUT(req: Request, { params }: RequestParams) {
   if (!(await checkPermission("lab.update")))
@@ -28,6 +29,12 @@ export async function DELETE(req: Request, { params }: RequestParams) {
   try {
     const { id } = await params;
     const lab = await prisma.lab.delete({ where: { id } });
+
+    await createNotification({
+      title: "Lab Deleted",
+      message: `Laboratory resources have been decommissioned.`,
+      type: "ERROR",
+    });
 
     await prisma.log.create({
       data: {

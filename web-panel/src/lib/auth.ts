@@ -180,3 +180,14 @@ export const checkPermission = async (
     return false;
   }
 };
+
+export const checkAnyPermission = async (
+  permissionNames: string[],
+): Promise<boolean> => {
+  try {
+    const user = await getActionSession();
+    return permissionNames.some((perm) => user.permissions.includes(perm));
+  } catch (error) {
+    return false;
+  }
+};

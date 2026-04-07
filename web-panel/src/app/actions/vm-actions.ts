@@ -2,13 +2,16 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { pveFetch, getNextVmId, waitForTask } from "@/lib/proxmox";
-import { checkPermission, getActionSession } from "@/lib/auth";
+import { pveFetch, waitForTask } from "@/lib/proxmox";
+import {
+  checkPermission,
+  checkAnyPermission,
+  getActionSession,
+} from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 const TEMPLATE_ID = 100;
 const PROXMOX_NODE = process.env.PROXMOX_NODE || "pve";
-const PROXMOX_HOST =
-  process.env.PROXMOX_URL?.split(":8006")[0].replace("https://", "") || "";
 
 export async function CreateVmAction(
   proxmoxId: number,
@@ -21,55 +24,65 @@ export async function CreateVmAction(
   const user = await getActionSession();
 
   try {
-    // 1. Strictly enforce integers for Proxmox API
-    const newId = parseInt(String(proxmoxId), 10);
+    const vmid = parseInt(String(proxmoxId), 10);
     const templateId = parseInt(String(TEMPLATE_ID), 10);
 
-    if (isNaN(newId) || newId < 100) {
-      throw new Error("Invalid VM ID. It must be a number >= 100.");
-    }
-
-    // 2. Clone the VM
+    // 1. Proxmox Clone
     const cloneResponse = await pveFetch(
       `/nodes/${PROXMOX_NODE}/qemu/${templateId}/clone`,
       "POST",
-      {
-        newid: newId,
-        name: name,
-        full: 0, // 0 = Linked Clone
-      },
+      { newid: vmid, name: name, full: 0 },
     );
-
     await waitForTask(PROXMOX_NODE, cloneResponse.data);
 
-    // 3. Set Hostname
-    await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${newId}/config`, "POST", {
+    // 2. Proxmox Config
+    await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${vmid}/config`, "POST", {
       name: name,
+      hostname: hostname,
     });
 
-    // 4. Start VM
-    await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${newId}/status/start`, "POST");
+    // 3. Start
+    await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${vmid}/status/start`, "POST");
 
-    // 5. Update Database
+    // 4. Database Write
     const newVm = await prisma.vM.create({
-      data: { proxmoxId: newId, hostname: hostname, labId: labId },
+      data: { proxmoxId: vmid, hostname, labId },
+      include: { lab: true },
     });
 
+    // 5. System Log
     await prisma.log.create({
       data: {
         type: "VM_PROVISIONED",
         severity: "INFO",
-        message: `Provisioned VM '${name}' (Hostname: ${hostname}, ID: ${newId}).`,
+        message: `Provisioned VM '${name}' (ID: ${vmid}).`,
         targetId: newVm.id,
-        targetName: hostname,
         userId: user.id,
         labId,
       },
     });
 
+    // 6. CREATE NOTIFICATION
+    await prisma.notification.create({
+      data: {
+        title: "New VM Provisioned",
+        message: `Instance ${hostname} was successfully created in ${newVm.lab.name}.`,
+        type: "SUCCESS",
+        labId: labId,
+        link: "/admin/instances",
+      },
+    });
+    const io = (global as any).io;
+    if (io) {
+      io.emit("new-notification", {
+        title: "VM Provisioned",
+        message: `Instance ${hostname} is ready for use.`,
+        type: "SUCCESS",
+      });
+    }
+    revalidatePath("/admin/instances");
     return { success: true };
   } catch (error: any) {
-    // If the ID already exists, Proxmox will throw an error that we safely catch here
     throw new Error(error.message);
   }
 }
@@ -80,73 +93,85 @@ export async function DeleteVmAction(vmId: string, proxmoxId: number) {
   const user = await getActionSession();
 
   try {
-    // 1. Attempt to stop the VM.
-    // We wrap this in a specific try/catch so if the VM is ALREADY stopped,
-    // it doesn't crash the whole delete action.
+    // Fetch info before deletion for the notification
+    const vm = await prisma.vM.findUnique({
+      where: { id: vmId },
+      include: { lab: true },
+    });
+    if (!vm) throw new Error("VM not found");
+
+    // 1. Stop
     try {
       await pveFetch(
         `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}/status/stop`,
         "POST",
       );
-      // Wait for shutdown to complete
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (e) {
-      console.log(
-        `Stop command skipped for ${proxmoxId} (likely already stopped)`,
-      );
+      /* ignore if already stopped */
     }
 
-    // 2. Delete the VM (Now with no body content)
+    // 2. Delete
     const deleteResponse = await pveFetch(
       `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}`,
       "DELETE",
     );
-
-    // 3. Wait for the background deletion task to finish
-    // Proxmox returns the Task UPID in the .data field of the response
-    if (deleteResponse.data) {
+    if (deleteResponse.data)
       await waitForTask(PROXMOX_NODE, deleteResponse.data);
-    }
 
-    // 4. Remove from Postgres
-    const vm = await prisma.vM.delete({ where: { id: vmId } });
+    // 3. DB Cleanup
+    await prisma.vM.delete({ where: { id: vmId } });
 
-    // 5. Log the destruction
-    await prisma.log.create({
+    // 4. Notification
+    await prisma.notification.create({
       data: {
-        type: "VM_DESTROYED",
-        severity: "WARNING",
-        message: `User '${user.email}' destroyed VM '${vm.hostname}' (PVE ID: ${proxmoxId}).`,
-        targetId: vmId,
-        targetName: vm.hostname,
-        userId: user.id,
+        title: "VM Destroyed",
+        message: `Instance ${vm.hostname} has been permanently deleted from ${vm.lab.name}.`,
+        type: "WARNING",
         labId: vm.labId,
       },
     });
-
+    const io = (global as any).io;
+    if (io) {
+      io.emit("new-notification", {
+        title: "VM Destroyed",
+        message: `Instance ${vm.hostname} has been permanently removed.`,
+        type: "WARNING",
+      });
+    }
+    revalidatePath("/admin/instances");
     return { success: true };
   } catch (error: any) {
-    console.error("DeleteVmAction Error:", error.message);
     throw new Error(error.message);
   }
 }
 
 export async function StartVmAction(proxmoxId: number, vmId: string) {
-  const hasPermission = await checkPermission("vm.start");
-  if (!hasPermission) throw new Error("Unauthorized");
+  // THE FIX: Allow both Admin (vm.start) and Faculty (faculty.vm.control)
+  const hasAccess = await checkAnyPermission([
+    "vm.start",
+    "faculty.vm.control",
+  ]);
+  if (!hasAccess) throw new Error("Unauthorized");
 
   try {
     await pveFetch(
       `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}/status/start`,
       "POST",
     );
-    await prisma.log.create({
+
+    const vm = await prisma.vM.findUnique({ where: { id: vmId } });
+    await prisma.notification.create({
       data: {
-        type: "VM_STARTED",
-        message: `Started VM ID: ${proxmoxId}`,
-        targetId: vmId,
+        title: "VM Started",
+        message: `Instance ${vm?.hostname} is now powering up.`,
+        type: "INFO",
+        labId: vm?.labId,
       },
     });
+
+    revalidatePath("/admin/instances");
+    revalidatePath("/faculty/instances");
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -154,21 +179,28 @@ export async function StartVmAction(proxmoxId: number, vmId: string) {
 }
 
 export async function StopVmAction(proxmoxId: number, vmId: string) {
-  const hasPermission = await checkPermission("vm.stop");
-  if (!hasPermission) throw new Error("Unauthorized");
+  // THE FIX: Allow both Admin (vm.stop) and Faculty (faculty.vm.control)
+  const hasAccess = await checkAnyPermission(["vm.stop", "faculty.vm.control"]);
+  if (!hasAccess) throw new Error("Unauthorized");
 
   try {
     await pveFetch(
       `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}/status/stop`,
       "POST",
     );
-    await prisma.log.create({
+
+    const vm = await prisma.vM.findUnique({ where: { id: vmId } });
+    await prisma.notification.create({
       data: {
-        type: "VM_STOPPED",
-        message: `Stopped VM ID: ${proxmoxId}`,
-        targetId: vmId,
+        title: "VM Stopped",
+        message: `Instance ${vm?.hostname} has been powered off.`,
+        type: "INFO",
+        labId: vm?.labId,
       },
     });
+
+    revalidatePath("/admin/instances");
+    revalidatePath("/faculty/instances");
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -179,18 +211,34 @@ export async function MassVmAction(
   vms: { proxmoxId: number; id: string }[],
   action: "start" | "stop",
 ) {
-  const hasPermission = await checkPermission(`vm.${action}`);
-  if (!hasPermission) throw new Error("Unauthorized");
+  // THE FIX: Use a combined permission check
+  const guard = action === "start" ? "vm.start" : "vm.stop";
+  const hasAccess = await checkAnyPermission([guard, "faculty.vm.control"]);
+  if (!hasAccess) throw new Error("Unauthorized");
 
   try {
     const promises = vms.map((vm) =>
       pveFetch(
         `/nodes/${PROXMOX_NODE}/qemu/${vm.proxmoxId}/status/${action}`,
         "POST",
-      ).catch((e) => console.error(e)),
+      ),
     );
-
     await Promise.all(promises);
+
+    if (vms.length > 0) {
+      const firstVm = await prisma.vM.findUnique({ where: { id: vms[0].id } });
+      await prisma.notification.create({
+        data: {
+          title: `Mass ${action === "start" ? "Power On" : "Shutdown"}`,
+          message: `Successfully processed state change for ${vms.length} instances.`,
+          type: "INFO",
+          labId: firstVm?.labId,
+        },
+      });
+    }
+
+    revalidatePath("/admin/instances");
+    revalidatePath("/faculty/instances");
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -201,8 +249,9 @@ export async function GetVmConsoleAction(
   proxmoxId: number,
   type: "novnc" | "xtermjs" | "spice",
 ) {
-  const hasPermission = await checkPermission("vm.view");
-  if (!hasPermission) throw new Error("Unauthorized");
+  // THE FIX: Allow Admin (vm.view) or Faculty (faculty.vm.view)
+  const hasAccess = await checkAnyPermission(["vm.view", "faculty.vm.view"]);
+  if (!hasAccess) throw new Error("Unauthorized");
 
   const PROXMOX_NODE = process.env.PROXMOX_NODE || "pve";
 
@@ -211,27 +260,33 @@ export async function GetVmConsoleAction(
     const endpoint = `/nodes/${PROXMOX_NODE}/qemu/${proxmoxId}/${isSpice ? "spiceproxy" : "vncproxy"}`;
 
     const res = await pveFetch(endpoint, "POST");
-
-    // 🔥 FIX: Normalize Proxmox response
     const d = res?.data || res;
 
     if (isSpice) {
-      // 🔥 Validate required fields
-      if (!d || !d.password || !d["tls-port"] || !d.host) {
-        throw new Error("Invalid SPICE response from Proxmox");
+      // Normalize response (handles both {data:{}} and direct)
+      const spiceData = res?.data?.data || res?.data || res;
+
+      // 🔥 Correct validation (NO ticket)
+      if (
+        !spiceData ||
+        !spiceData.password ||
+        !spiceData["tls-port"] ||
+        !spiceData.host
+      ) {
+        console.error("SPICE RAW RESPONSE:", JSON.stringify(res, null, 2));
+        throw new Error("Invalid SPICE response");
       }
 
       return {
         success: true,
         type: "file",
-        data: d,
+        data: spiceData,
         filename: `console-${proxmoxId}.vv`,
       };
     }
 
     const baseUrl = process.env.PROXMOX_URL?.split("/api2")[0];
     const isXterm = type === "xtermjs";
-
     const params = new URLSearchParams({
       console: "kvm",
       vmid: String(proxmoxId),
