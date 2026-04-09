@@ -6,14 +6,12 @@ import { nextApp, nextHandler } from "./next-instance";
 import { prisma } from "./src/lib/prisma";
 import { logger } from "./src/lib/logger";
 
-// Initialize scoped child logger
 const log = logger.child({ module: "infra-worker" });
-
-// 1. Fixed PORT logic: Ensure it's a number for .listen()
 const PORT_NUMBER = parseInt(process.env.PORT || "3000", 10);
 
-// 2. Safer Broker Cleanup: Avoids Regex parsing issues
-const rawBroker = process.env.KAFKA_BROKER || "192.168.0.136:9092";
+// 1. Kafka Configuration
+// Ensure we use localhost for the internal consumer if running on the same host as Docker
+const rawBroker = process.env.KAFKA_BROKER || "localhost:9092";
 const cleanBroker = rawBroker.includes("://")
   ? rawBroker.split("://")[1]
   : rawBroker;
@@ -29,7 +27,7 @@ const alertCooldowns: Record<string, number> = {};
 const COOLDOWN_MS = 5 * 60 * 1000;
 
 async function startServer() {
-  log.info("Preparing Next.js application instance...");
+  log.info("Preparing Next.js application...");
   await nextApp.prepare();
 
   const httpServer = createServer((req, res) => {
@@ -42,28 +40,35 @@ async function startServer() {
 
   (global as any).io = io;
 
+  // 2. Setup Kafka Consumer with DYNAMIC Group ID
+  // This forces Kafka to send us the most recent data immediately on every restart
   const consumer = kafka.consumer({
-    groupId: "vdi-metrics-group",
+    groupId: `vdi-metrics-runtime-${Date.now()}`, // Unique ID per restart
     sessionTimeout: 30000,
     heartbeatInterval: 3000,
   });
 
   const runKafkaConsumer = async () => {
     try {
-      log.info({ broker: cleanBroker }, "Connecting to Kafka cluster...");
       await consumer.connect();
+      // Set fromBeginning: false to only get "Live" data,
+      // or true to fill the chart with recent history on load
       await consumer.subscribe({ topic: "vm-metrics", fromBeginning: false });
-      log.info("Kafka subscription active");
+      log.info({ broker: cleanBroker }, "Kafka Consumer Online & Subscribed");
 
       await consumer.run({
         eachMessage: async ({ message }) => {
           if (!message.value) return;
+
           try {
             const rawData = JSON.parse(message.value.toString());
             const host = rawData.tags?.host;
             const mName = rawData.name;
 
             if (!host) return;
+
+            // Debug log to confirm packets are arriving in the console
+            log.trace({ host, measurement: mName }, "Incoming Kafka Packet");
 
             if (!hostState[host]) {
               hostState[host] = {
@@ -78,6 +83,7 @@ async function startServer() {
               };
             }
 
+            // Logic for merging fragments
             if (mName === "cpu" && rawData.tags.cpu === "cpu-total") {
               hostState[host].cpu = rawData.fields.usage_active || 0;
               checkThresholds(host, "CPU", hostState[host].cpu, 90, io);
@@ -104,27 +110,29 @@ async function startServer() {
             }
 
             hostState[host].timestamp = new Date().toLocaleTimeString();
+
+            // EMIT TO WEBSOCKET
             io.emit("vm-metrics-update", hostState[host]);
           } catch (err) {
-            log.error({ err }, "Kafka message parse error");
+            log.error("Failed to process Kafka message JSON");
           }
         },
       });
     } catch (err: any) {
-      log.fatal({ err: err.message }, "Kafka Terminal Error");
+      log.error({ err: err.message }, "Kafka Consumer Connection Failed");
     }
   };
 
   runKafkaConsumer().catch((err) => log.error({ err }, "Consumer Crash"));
 
   io.on("connection", (socket) => {
-    log.debug({ socketId: socket.id }, "Client connected");
+    log.debug({ socketId: socket.id }, "Dashboard Browser Connected");
   });
 
   httpServer.listen(PORT_NUMBER, "0.0.0.0", () => {
     log.info(`\n🚀 VDI CONTROL PLANE ONLINE`);
     log.info(`> Dashboard: http://localhost:${PORT_NUMBER}`);
-    log.info(`> Alerts: CPU/RAM > 90%\n`);
+    log.info(`> Listening on all interfaces (0.0.0.0)`);
   });
 }
 
@@ -136,23 +144,19 @@ async function checkThresholds(
   io: Server,
 ) {
   if (value < limit) return;
-
   const cooldownKey = `${host}-${type}`;
   const now = Date.now();
-
   if (
     alertCooldowns[cooldownKey] &&
     now - alertCooldowns[cooldownKey] < COOLDOWN_MS
-  ) {
+  )
     return;
-  }
 
   try {
     const vm = await prisma.vM.findFirst({
       where: { hostname: host },
       include: { lab: true },
     });
-
     if (!vm) return;
 
     await prisma.notification.create({
