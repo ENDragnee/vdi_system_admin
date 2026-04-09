@@ -6,3 +6,7 @@
 	path = vm-agent
 	url = git@github.com:ENDragnee/vdi-vm-agents.git
 	branch = main
+[submodule "vdi-console"]
+	path = vdi-console
+	url = git@github.com:ENDragnee/vdi-console.git
+	branch = main
