@@ -38,15 +38,23 @@ Create a `.env` file based on `.env.example` with the following critical variabl
 
 The application runs using `server.ts` which orchestrates the Next.js frontend with backend services.
 
-### 2.1 `server.ts` (Kafka & WebSockets Bridge)
-This entry point (`server.ts`) initializes the Next.js app and simultaneously sets up a Node.js HTTP server. It integrates:
--   **Kafka Consumer:** Connects to the `vm-metrics` topic, ingests telemetry, and processes real-time CPU/RAM thresholds.
--   **Socket.io Server:** Broadcasts live VM metrics and notifications to connected frontend clients via WebSockets (`vm-metrics-update`, `new-notification`).
+### 2.1 Execution Logic (Next.js + WebSocket Worker)
+The application utilizes a custom server to bridge Next.js with Kafka and WebSockets. The following commands are the standard way to run the project:
 
-To start the server:
-```bash
-pnpm tsx server.ts
-```
+- **Development:**
+  ```bash
+  pnpm dev:websocket
+  ```
+- **Build:**
+  ```bash
+  pnpm build:websocket
+  ```
+- **Production Start:**
+  ```bash
+  pnpm start:websocket
+  ```
+
+These commands utilize `tsx` to execute `server.ts`, which initializes the Next.js handler while simultaneously running the Kafka consumer and Socket.io server.
 
 ## 3. GitOps Workflow
 
