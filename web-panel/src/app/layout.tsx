@@ -1,13 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Libre_Baskerville, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/provider/theme-provider";
 import SessionProviderWrapper from "@/provider/session-provider";
 import { QueryProvider } from "@/provider/query-provider";
 import { NotificationProvider } from "@/provider/notification-provider";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const libreBaskerville = Libre_Baskerville({ 
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-sans" 
+});
+const geistMono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
@@ -32,7 +36,7 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning={true}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-primary selection:text-primary-foreground`}>
+      <body className={`${libreBaskerville.variable} ${geistMono.variable} antialiased selection:bg-primary selection:text-primary-foreground font-sans`}>
         <SessionProviderWrapper>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <QueryProvider>
