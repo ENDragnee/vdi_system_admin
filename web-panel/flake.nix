@@ -16,10 +16,12 @@
     in {
       devShells.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
-          nodejs_20
-          nodePackages.pnpm
+          nodejs_24
+          pnpm
           openssl
           pkg-config
+          git # Added for GitOps
+          cacert # Added for SSL verification
         ];
 
         buildInputs = with pkgs; [

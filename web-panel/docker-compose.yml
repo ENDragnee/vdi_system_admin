@@ -74,6 +74,31 @@ services:
     depends_on:
       - kafka
 
+  gitea:
+    image: gitea/gitea:1.22
+    container_name: vdi-gitea
+    restart: unless-stopped
+    networks:
+      - vdi_network
+    ports:
+      - "3001:3000"
+      - "2222:22"
+    environment:
+      - GITEA__server__DOMAIN=vds-host.local
+      - GITEA__server__SSH_DOMAIN=vds-host.local
+      - GITEA__server__SSH_PORT=2222
+      - GITEA__server__ROOT_URL=http://vds-host.local:3001/
+      - GITEA__service__DISABLE_REGISTRATION=true # No one else can sign up
+      - GITEA__service__REQUIRE_SIGNIN_VIEW=true # Must login to see anything
+      - GITEA__security__INSTALL_LOCK=true # Skip the web installer UI
+      - GITEA__database__DB_TYPE=sqlite3 # Explicitly use SQLite
+      - USER_UID=1000
+      - USER_GID=1000
+    volumes:
+      - gitea_data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+
   nextjs_app:
     build:
       context: .
@@ -94,6 +119,7 @@ volumes:
   vdi_admin_postgres:
   influxdb_data:
   kafka_data:
+  gitea_data:
 
 networks:
   vdi_network:
