@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import AuthClientPage from "../app/auth/auth-client";
 import { signIn } from "next-auth/react";
+import { getRedirectPath } from "../app/actions/auth-actions";
 
 
 // Mock Next.js Router
@@ -20,11 +21,16 @@ vi.mock("next-auth/react", () => ({
   signIn: vi.fn(),
 }));
 
+vi.mock("../app/actions/auth-actions", () => ({
+  getRedirectPath: vi.fn(),
+}));
+
 describe("AuthClientPage", () => {
   // Clear mocks and timers before each test to ensure isolation
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    vi.mocked(getRedirectPath).mockResolvedValue("/dashboard");
   });
 
   it("renders the sign in form correctly", () => {
@@ -58,10 +64,11 @@ describe("AuthClientPage", () => {
       redirect: false,
     });
 
+    expect(getRedirectPath).toHaveBeenCalled();
+
     // Verify router functions were called
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/dashboard");
-      expect(mockRefresh).toHaveBeenCalled();
     });
   });
 

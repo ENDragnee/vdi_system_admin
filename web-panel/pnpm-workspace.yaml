@@ -1,4 +1,4 @@
-ignoredBuiltDependencies:
+﻿ignoredBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
   - better-sqlite3
