@@ -1,13 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Libre_Baskerville, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/provider/theme-provider";
 import SessionProviderWrapper from "@/provider/session-provider";
 import { QueryProvider } from "@/provider/query-provider";
 import { NotificationProvider } from "@/provider/notification-provider";
 
-const libreBaskerville = Libre_Baskerville({ 
-  weight: ["400", "700"],
+const inter = Inter({ 
   subsets: ["latin"],
   variable: "--font-sans" 
 });
@@ -36,7 +35,7 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning={true}>
-      <body className={`${libreBaskerville.variable} ${geistMono.variable} antialiased selection:bg-primary selection:text-primary-foreground font-sans`}>
+      <body className={`${inter.variable} ${geistMono.variable} antialiased selection:bg-primary selection:text-primary-foreground font-sans`}>
         <SessionProviderWrapper>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <QueryProvider>

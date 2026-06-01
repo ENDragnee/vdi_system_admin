@@ -1,4 +1,9 @@
 // src/app/actions/vm-actions.ts
+/**
+ * Server Actions for Virtual Machine (VM) Management.
+ * Handles permission validation, Proxmox VE orchestration, Prisma state updates,
+ * audit logging, real-time WebSocket alerts, and next-cache revalidations.
+ */
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -13,6 +18,18 @@ import { revalidatePath } from "next/cache";
 const TEMPLATE_ID = 100;
 const PROXMOX_NODE = process.env.PROXMOX_NODE || "pve";
 
+/**
+ * Creates and provisions a new QEMU VM by cloning the base template,
+ * assigning a custom name, powering it on, and adding a record to the database.
+ * 
+ * @security Requires 'vm.create' permission.
+ * @param proxmoxId - The unique ID to allocate in Proxmox (must be >= 100).
+ * @param name - The friendly name of the virtual machine.
+ * @param hostname - The unique hostname address.
+ * @param labId - The CUID of the physical/virtual lab associating this VM.
+ * @returns A promise resolving to { success: true } on execution.
+ * @throws An error on authorization failure, validation failure, or PVE task failure.
+ */
 export async function CreateVmAction(
   proxmoxId: number,
   name: string,
@@ -20,7 +37,7 @@ export async function CreateVmAction(
   labId: string,
 ) {
   const hasPermission = await checkPermission("vm.create");
-  if (!hasPermission) throw new Error("Unauthorized");
+  if (!hasPermission) throw new Error("Unauthorized: Missing 'vm.create' permission.");
   const user = await getActionSession();
 
   try {
@@ -31,31 +48,31 @@ export async function CreateVmAction(
       throw new Error("Invalid VM ID. It must be a number >= 100.");
     }
 
-    // 1. Proxmox Clone
-    const cloneResponse = await pveFetch(
+    // 1. Trigger Proxmox QEMU Clone Task
+    const cloneResponse = await pveFetch<any>(
       `/nodes/${PROXMOX_NODE}/qemu/${templateId}/clone`,
       "POST",
       { newid: vmid, name: name, full: 0 },
     );
+    // Block thread execution until Proxmox cloning is completely finished
     await waitForTask(PROXMOX_NODE, cloneResponse.data);
 
-    // 2. Proxmox Config
-    // FIX: Removed 'hostname' parameter as PVE API rejects it for QEMU in this context.
-    // Setting 'name' is the standard way to define the VM identity.
+    // 2. Set VM System Configuration
+    // Removed legacy 'hostname' parameter as PVE API rejects it for standard QEMU here.
     await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${vmid}/config`, "POST", {
       name: name,
     });
 
-    // 3. Start VM
+    // 3. Start the newly provisioned Virtual Machine
     await pveFetch(`/nodes/${PROXMOX_NODE}/qemu/${vmid}/status/start`, "POST");
 
-    // 4. Update Database
+    // 4. Update the local PostgreSQL database state
     const newVm = await prisma.vM.create({
       data: { proxmoxId: vmid, hostname: hostname, labId: labId },
       include: { lab: true },
     });
 
-    // 5. System Log & Notification
+    // 5. Write an immutable System Log for compliance
     await prisma.log.create({
       data: {
         type: "VM_PROVISIONED",
@@ -67,6 +84,7 @@ export async function CreateVmAction(
       },
     });
 
+    // 6. Register a system notification
     await prisma.notification.create({
       data: {
         title: "New VM Provisioned",
@@ -77,6 +95,7 @@ export async function CreateVmAction(
       },
     });
 
+    // 7. Emit real-time updates over WebSocket
     const io = (global as any).io;
     if (io) {
       io.emit("new-notification", {
@@ -86,6 +105,7 @@ export async function CreateVmAction(
       });
     }
 
+    // Force revalidation ofNext.js router cache to show fresh data
     revalidatePath("/admin/instances");
     return { success: true };
   } catch (error: any) {

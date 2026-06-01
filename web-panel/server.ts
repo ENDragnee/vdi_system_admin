@@ -22,9 +22,26 @@ const kafka = new Kafka({
   logLevel: logLevel.ERROR,
 });
 
-const hostState: Record<string, any> = {};
+/**
+ * Represents the structure of VM/Host metrics received from telemetry.
+ */
+interface HostMetrics {
+  host: string;       // Unique hostname of the instance
+  cpu: number;        // CPU usage percentage (0-100)
+  ram: number;        // RAM usage percentage (0-100)
+  netIn: number;      // Inbound network throughput in MB/s
+  netOut: number;     // Outbound network throughput in MB/s
+  uptime: number;     // Total system uptime in seconds
+  disk: number;       // Disk usage percentage (0-100)
+  timestamp: string;  // Localized string timestamp of the metric snapshot
+}
+
+// Global state cache to hold the merged, latest metrics from various Kafka message fragments per host.
+const hostState: Record<string, HostMetrics> = {};
+
+// Tracking alert triggers to prevent spamming notifications during resource spikes.
 const alertCooldowns: Record<string, number> = {};
-const COOLDOWN_MS = 5 * 60 * 1000;
+const COOLDOWN_MS = 5 * 60 * 1000; // 5 minute notification cooldown per host-resource pair
 
 async function startServer() {
   log.info("Preparing Next.js application...");

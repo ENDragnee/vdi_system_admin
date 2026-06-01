@@ -1,21 +1,32 @@
-// middleware.ts (or proxy.ts)
+/**
+ * middleware.ts / proxy.ts
+ * 
+ * Centralized Role-Based Access Control (RBAC) Middleware.
+ * Leverages `next-auth/middleware` to intercept requests on matcher paths,
+ * parses the authenticated user JWT session, and validates custom permissions.
+ */
 import { withAuth, NextRequestWithAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
-// 1. Define your Role-Based Access Control (RBAC) rules here.
-// Routes are evaluated top-to-bottom. Put more specific paths at the top.
-const routeAccessRules = [
+interface AccessRule {
+  prefix: string;        // URL path prefix to check against
+  allowedRoles: string[]; // Set of roles that have read/write access
+}
+
+// Access rules are evaluated top-to-bottom. 
+// Place more specific or restrictive paths at the very top of the list.
+const routeAccessRules: AccessRule[] = [
   { prefix: "/admin", allowedRoles: ["ADMIN"] },
   { prefix: "/api/admin", allowedRoles: ["ADMIN"] },
 
-  // Example: Faculty routes allow both ADMIN and FACULTY
+  // Faculty workspace & management access
   { prefix: "/faculty", allowedRoles: ["ADMIN", "FACULTY"] },
   { prefix: "/api/faculty", allowedRoles: ["ADMIN", "FACULTY"] },
 
-  // Example: Lab management
+  // Physical/Virtual Lab configuration routes
   { prefix: "/labs", allowedRoles: ["ADMIN", "FACULTY"] },
 
-  // Generic protected routes that require ANY valid user
+  // Standard user workspace access (any valid user)
   { prefix: "/dashboard", allowedRoles: ["ADMIN", "FACULTY", "USER"] },
 ];
 
@@ -52,18 +63,16 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token && token.invalid !== true,
+      authorized: ({ token }: { token: any }) => !!token && token.invalid !== true,
     },
   },
 );
 
-// 6. Define ALL paths that require authentication here.
+// Define explicit route matchers for intercepting incoming HTTP requests requiring authentication
 export const config = {
   matcher: [
-    // "/admin/:path*",
     "/api/admin/:path*",
     "/faculty/:path*",
-//    "/api/faculty/:path*",
     "/labs/:path*",
     "/dashboard/:path*",
     "/api/protected/:path*",
